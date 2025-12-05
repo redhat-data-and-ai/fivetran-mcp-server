@@ -11,6 +11,8 @@ All Fivetran troubleshooting tools are implemented here.
 | `get_connector_details` | `connectors.py` | Get full connector details |
 | `list_failed_connectors` | `connectors.py` | Find problem connectors |
 | `get_connector_schema_status` | `connectors.py` | Table-level sync status |
+| `list_hybrid_agents` | `connectors.py` | List all hybrid deployment agents |
+| `get_hybrid_agent_details` | `connectors.py` | Get hybrid agent details |
 
 ## Adding New Tools
 

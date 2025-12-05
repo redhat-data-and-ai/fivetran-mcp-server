@@ -18,6 +18,8 @@ A read-only MCP (Model Context Protocol) server for troubleshooting and diagnosi
 | `get_connector_details(connector_id)` | Get full connector details for troubleshooting |
 | `list_failed_connectors(group_id?)` | Find connectors with issues |
 | `get_connector_schema_status(connector_id)` | Get table-level sync status |
+| `list_hybrid_agents()` | List all Hybrid Deployment Agents and their status |
+| `get_hybrid_agent_details(agent_id)` | Get details for a specific hybrid agent |
 
 ## Quick Start
 
@@ -83,6 +85,8 @@ curl http://localhost:8080/health
    - "Show connectors in group X"
    - "Show failed connectors"
    - "Get details for connector xyz"
+   - "Show me all hybrid agents"
+   - "What's the status of hybrid agent abc?"
 
 ## Configuration
 
@@ -131,6 +135,16 @@ get_connector_details(connector_id="abc123")
 ### Check table sync status
 ```
 get_connector_schema_status(connector_id="abc123")
+```
+
+### List hybrid deployment agents
+```
+list_hybrid_agents()
+```
+
+### Get hybrid agent details
+```
+get_hybrid_agent_details(agent_id="abc123")
 ```
 
 ## Project Structure

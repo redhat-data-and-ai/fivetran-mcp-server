@@ -294,3 +294,91 @@ async def get_connector_schema_status(connector_id: str) -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Error getting schema status for {connector_id}: {e}")
         return {"status": "error", "error": str(e)}
+
+
+async def list_hybrid_agents() -> Dict[str, Any]:
+    """List all Hybrid Deployment Agents and their status.
+
+    Shows all Local Processing Agents (hybrid agents) in your account,
+    including their connection status, version, and health.
+
+    Returns:
+        Dict containing:
+            - status: "success" or "error"
+            - agents: List of agents with id, display_name, registered_at, status
+            - count: Total number of agents
+    """
+    try:
+        client = get_fivetran_client()
+        response = await client.get("local-processing-agents")
+
+        agents = response.get("data", {}).get("items", [])
+
+        processed = []
+        for agent in agents:
+            processed.append({
+                "id": agent.get("id"),
+                "display_name": agent.get("display_name"),
+                "group_id": agent.get("group_id"),
+                "registered_at": agent.get("registered_at"),
+                "usage": agent.get("usage", []),
+            })
+
+        logger.info(f"Listed {len(processed)} hybrid agents")
+
+        return {
+            "status": "success",
+            "agents": processed,
+            "count": len(processed),
+        }
+
+    except ValueError as e:
+        logger.error(f"Configuration error: {e}")
+        return {"status": "error", "error": str(e)}
+    except Exception as e:
+        logger.error(f"Error listing hybrid agents: {e}")
+        return {"status": "error", "error": str(e)}
+
+
+async def get_hybrid_agent_details(agent_id: str) -> Dict[str, Any]:
+    """Get detailed status for a specific Hybrid Deployment Agent.
+
+    Retrieves comprehensive information about a hybrid agent including
+    connection status, version, and assigned connectors.
+
+    Args:
+        agent_id: The unique identifier for the hybrid agent.
+
+    Returns:
+        Dict containing:
+            - status: "success" or "error"
+            - agent_id: The agent ID
+            - display_name: Human-readable agent name
+            - group_id: Associated group/destination
+            - registered_at: When the agent was registered
+            - usage: List of connectors using this agent
+    """
+    try:
+        client = get_fivetran_client()
+        response = await client.get(f"local-processing-agents/{agent_id}")
+
+        agent = response.get("data", {})
+
+        logger.info(f"Retrieved details for hybrid agent: {agent_id}")
+
+        return {
+            "status": "success",
+            "agent_id": agent_id,
+            "display_name": agent.get("display_name"),
+            "group_id": agent.get("group_id"),
+            "registered_at": agent.get("registered_at"),
+            "files": agent.get("files", []),
+            "usage": agent.get("usage", []),
+        }
+
+    except ValueError as e:
+        logger.error(f"Configuration error: {e}")
+        return {"status": "error", "error": str(e)}
+    except Exception as e:
+        logger.error(f"Error getting hybrid agent {agent_id}: {e}")
+        return {"status": "error", "error": str(e)}
