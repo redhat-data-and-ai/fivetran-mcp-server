@@ -17,6 +17,33 @@ from fivetran_mcp_server.utils.pylogger import get_python_logger
 logger = get_python_logger()
 
 
+class FivetranAPIError(Exception):
+    """Custom exception for Fivetran API errors with helpful context."""
+
+    def __init__(
+        self,
+        status_code: int,
+        message: str,
+        hint: str = "",
+        docs: str = "",
+    ):
+        self.status_code = status_code
+        self.message = message
+        self.hint = hint
+        self.docs = docs
+        super().__init__(self.message)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert error to dictionary for API responses."""
+        return {
+            "status": "error",
+            "error": self.message,
+            "status_code": self.status_code,
+            "hint": self.hint,
+            "docs": self.docs,
+        }
+
+
 class FivetranClient:
     """Client for interacting with the Fivetran REST API.
 
@@ -65,6 +92,68 @@ class FivetranClient:
 
         logger.info("Fivetran client initialized", base_url=self.base_url)
 
+    def _handle_error(self, response: httpx.Response, endpoint: str) -> None:
+        """Handle HTTP errors with helpful messages.
+
+        Args:
+            response: The HTTP response object.
+            endpoint: The API endpoint that was called.
+
+        Raises:
+            FivetranAPIError: With helpful error message and hints.
+        """
+        status = response.status_code
+        
+        error_messages = {
+            401: {
+                "error": "Authentication failed",
+                "hint": "Check FIVETRAN_API_KEY and FIVETRAN_API_SECRET are correct",
+                "docs": "https://fivetran.com/docs/rest-api/getting-started",
+            },
+            403: {
+                "error": "Access forbidden",
+                "hint": "Your API key may not have permission for this resource",
+                "docs": "https://fivetran.com/docs/rest-api/api-reference",
+            },
+            404: {
+                "error": f"Resource not found: {endpoint}",
+                "hint": "Check the connector_id, group_id, or agent_id is correct",
+                "docs": "https://fivetran.com/docs/rest-api/api-reference",
+            },
+            429: {
+                "error": "Rate limit exceeded",
+                "hint": "Too many requests. Wait a moment and try again",
+                "docs": "https://fivetran.com/docs/rest-api/api-limits",
+            },
+            500: {
+                "error": "Fivetran server error",
+                "hint": "This is a Fivetran-side issue. Try again later",
+                "docs": "https://status.fivetran.com",
+            },
+        }
+
+        if status in error_messages:
+            info = error_messages[status]
+            raise FivetranAPIError(
+                status_code=status,
+                message=info["error"],
+                hint=info["hint"],
+                docs=info["docs"],
+            )
+        else:
+            # Generic error
+            try:
+                body = response.json()
+                message = body.get("message", response.text)
+            except Exception:
+                message = response.text
+            raise FivetranAPIError(
+                status_code=status,
+                message=f"API error: {message}",
+                hint="Check the Fivetran API documentation",
+                docs="https://fivetran.com/docs/rest-api/api-reference",
+            )
+
     async def get(self, endpoint: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
         """Make a GET request to the Fivetran API.
 
@@ -76,14 +165,15 @@ class FivetranClient:
             Dict containing the API response.
 
         Raises:
-            httpx.HTTPStatusError: If the request fails.
+            FivetranAPIError: If the request fails with helpful error info.
         """
         url = f"{self.base_url}/{endpoint.lstrip('/')}"
         logger.debug(f"GET {url}")
 
         async with httpx.AsyncClient() as client:
             response = await client.get(url, headers=self.headers, params=params)
-            response.raise_for_status()
+            if response.status_code >= 400:
+                self._handle_error(response, endpoint)
             return response.json()
 
     async def post(self, endpoint: str, data: Dict[str, Any]) -> Dict[str, Any]:
@@ -97,14 +187,15 @@ class FivetranClient:
             Dict containing the API response.
 
         Raises:
-            httpx.HTTPStatusError: If the request fails.
+            FivetranAPIError: If the request fails with helpful error info.
         """
         url = f"{self.base_url}/{endpoint.lstrip('/')}"
         logger.debug(f"POST {url}")
 
         async with httpx.AsyncClient() as client:
             response = await client.post(url, headers=self.headers, json=data)
-            response.raise_for_status()
+            if response.status_code >= 400:
+                self._handle_error(response, endpoint)
             return response.json()
 
     async def patch(self, endpoint: str, data: Dict[str, Any]) -> Dict[str, Any]:
@@ -118,14 +209,15 @@ class FivetranClient:
             Dict containing the API response.
 
         Raises:
-            httpx.HTTPStatusError: If the request fails.
+            FivetranAPIError: If the request fails with helpful error info.
         """
         url = f"{self.base_url}/{endpoint.lstrip('/')}"
         logger.debug(f"PATCH {url}")
 
         async with httpx.AsyncClient() as client:
             response = await client.patch(url, headers=self.headers, json=data)
-            response.raise_for_status()
+            if response.status_code >= 400:
+                self._handle_error(response, endpoint)
             return response.json()
 
     async def delete(self, endpoint: str) -> Dict[str, Any]:
@@ -138,14 +230,15 @@ class FivetranClient:
             Dict containing the API response.
 
         Raises:
-            httpx.HTTPStatusError: If the request fails.
+            FivetranAPIError: If the request fails with helpful error info.
         """
         url = f"{self.base_url}/{endpoint.lstrip('/')}"
         logger.debug(f"DELETE {url}")
 
         async with httpx.AsyncClient() as client:
             response = await client.delete(url, headers=self.headers)
-            response.raise_for_status()
+            if response.status_code >= 400:
+                self._handle_error(response, endpoint)
             return response.json()
 
 

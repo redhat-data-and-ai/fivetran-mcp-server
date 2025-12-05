@@ -8,6 +8,7 @@ from fastmcp import FastMCP
 
 from fivetran_mcp_server.src.settings import settings
 from fivetran_mcp_server.src.tools.connectors import (
+    diagnose_connector,
     get_connector_details,
     get_connector_schema_status,
     get_hybrid_agent_details,
@@ -58,6 +59,7 @@ class FivetranMCPServer:
         - get_connector_schema_status: See table-level sync status
         - list_hybrid_agents: List all hybrid deployment agents
         - get_hybrid_agent_details: Get details for a specific hybrid agent
+        - diagnose_connector: Comprehensive health check with recommendations
         """
         self.mcp.tool()(list_groups)
         self.mcp.tool()(list_connectors)
@@ -66,5 +68,6 @@ class FivetranMCPServer:
         self.mcp.tool()(get_connector_schema_status)
         self.mcp.tool()(list_hybrid_agents)
         self.mcp.tool()(get_hybrid_agent_details)
+        self.mcp.tool()(diagnose_connector)
 
-        logger.info("Registered 7 Fivetran troubleshooting tools (read-only)")
+        logger.info("Registered 8 Fivetran troubleshooting tools (read-only)")

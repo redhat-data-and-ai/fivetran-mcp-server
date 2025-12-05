@@ -20,6 +20,7 @@ A read-only MCP (Model Context Protocol) server for troubleshooting and diagnosi
 | `get_connector_schema_status(connector_id)` | Get table-level sync status |
 | `list_hybrid_agents()` | List all Hybrid Deployment Agents and their status |
 | `get_hybrid_agent_details(agent_id)` | Get details for a specific hybrid agent |
+| `diagnose_connector(connector_id)` | **Smart** health check with recommendations |
 
 ## Quick Start
 
@@ -146,6 +147,13 @@ list_hybrid_agents()
 ```
 get_hybrid_agent_details(agent_id="abc123")
 ```
+
+### Diagnose a connector (smart health check)
+```
+diagnose_connector(connector_id="abc123")
+```
+
+Returns overall health status, issues with severity levels, and actionable recommendations.
 
 ## Project Structure
 

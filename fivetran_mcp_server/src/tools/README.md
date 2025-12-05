@@ -13,6 +13,7 @@ All Fivetran troubleshooting tools are implemented here.
 | `get_connector_schema_status` | `connectors.py` | Table-level sync status |
 | `list_hybrid_agents` | `connectors.py` | List all hybrid deployment agents |
 | `get_hybrid_agent_details` | `connectors.py` | Get hybrid agent details |
+| `diagnose_connector` | `connectors.py` | Smart health check with recommendations |
 
 ## Adding New Tools
 
