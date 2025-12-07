@@ -21,7 +21,6 @@ pytest tests/test_mcp.py -v
 |------|-------------|
 | `conftest.py` | Pytest fixtures |
 | `test_api.py` | FastAPI endpoint tests |
-| `test_basic.py` | Basic functionality tests |
 | `test_main.py` | Server startup tests |
 | `test_mcp.py` | MCP server tests |
 | `test_settings.py` | Configuration tests |

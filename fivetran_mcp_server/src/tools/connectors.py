@@ -4,13 +4,24 @@ This module provides read-only MCP tools for diagnosing Fivetran connector issue
 Works with any Fivetran account - filter connectors by group_id.
 """
 
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from fivetran_mcp_server.src.fivetran_client import FivetranAPIError, get_fivetran_client
+from fivetran_mcp_server.src.fivetran_client import (
+    FivetranAPIError,
+    get_fivetran_client,
+)
 from fivetran_mcp_server.utils.pylogger import get_python_logger
-from datetime import datetime, timezone
 
 logger = get_python_logger()
+
+# Fivetran dashboard base URL for connector links
+FIVETRAN_DASHBOARD_URL = "https://fivetran.com/dashboard/connectors"
+
+
+def _get_connector_url(connector_id: str) -> str:
+    """Generate Fivetran dashboard URL for a connector."""
+    return f"{FIVETRAN_DASHBOARD_URL}/{connector_id}/status"
 
 
 async def list_groups() -> Dict[str, Any]:
@@ -63,7 +74,7 @@ async def list_connectors(group_id: Optional[str] = None) -> Dict[str, Any]:
     to a specific destination/group.
 
     Args:
-        group_id: Optional group ID to filter connectors. Use list_groups() 
+        group_id: Optional group ID to filter connectors. Use list_groups()
                   to find available group IDs.
 
     Returns:
@@ -92,16 +103,19 @@ async def list_connectors(group_id: Optional[str] = None) -> Dict[str, Any]:
             filter_desc = "none"
 
         # Simplify connector info
-        simplified = [
-            {
-                "id": c.get("id"),
-                "service": c.get("service"),
-                "schema": c.get("schema"),
-                "group_id": c.get("group_id"),
-                "paused": c.get("paused", False),
-            }
-            for c in all_connectors
-        ]
+        simplified = []
+        for c in all_connectors:
+            connector_id = c.get("id")
+            simplified.append(
+                {
+                    "id": connector_id,
+                    "service": c.get("service"),
+                    "schema": c.get("schema"),
+                    "group_id": c.get("group_id"),
+                    "paused": c.get("paused", False),
+                    "dashboard_url": _get_connector_url(connector_id),
+                }
+            )
 
         logger.info(f"Listed {len(simplified)} connectors (filters: {filter_desc})")
 
@@ -145,6 +159,7 @@ async def get_connector_details(connector_id: str) -> Dict[str, Any]:
         return {
             "status": "success",
             "connector_id": connector_id,
+            "dashboard_url": _get_connector_url(connector_id),
             "service": c.get("service"),
             "schema": c.get("schema"),
             "group_id": c.get("group_id"),
@@ -212,16 +227,20 @@ async def list_failed_connectors(group_id: Optional[str] = None) -> Dict[str, An
             )
 
             if has_issues:
-                failed.append({
-                    "id": c.get("id"),
-                    "service": c.get("service"),
-                    "schema": c.get("schema"),
-                    "group_id": c.get("group_id"),
-                    "sync_state": sync_state,
-                    "setup_state": setup_state,
-                    "warning_count": len(warnings),
-                    "warnings": warnings[:3],
-                })
+                connector_id = c.get("id")
+                failed.append(
+                    {
+                        "id": connector_id,
+                        "service": c.get("service"),
+                        "schema": c.get("schema"),
+                        "group_id": c.get("group_id"),
+                        "sync_state": sync_state,
+                        "setup_state": setup_state,
+                        "warning_count": len(warnings),
+                        "warnings": warnings[:3],
+                        "dashboard_url": _get_connector_url(connector_id),
+                    }
+                )
 
         logger.info(f"Found {len(failed)} connectors with issues")
 
@@ -267,24 +286,29 @@ async def get_connector_schema_status(connector_id: str) -> Dict[str, Any]:
             tables = schema_info.get("tables", {})
 
             for table_name, table_info in tables.items():
-                tables_list.append({
-                    "name": table_name,
-                    "enabled": table_info.get("enabled", False),
-                    "sync_mode": table_info.get("sync_mode"),
-                })
+                tables_list.append(
+                    {
+                        "name": table_name,
+                        "enabled": table_info.get("enabled", False),
+                        "sync_mode": table_info.get("sync_mode"),
+                    }
+                )
 
-            schemas_list.append({
-                "name": schema_name,
-                "enabled": schema_info.get("enabled", False),
-                "tables": tables_list,
-                "table_count": len(tables_list),
-            })
+            schemas_list.append(
+                {
+                    "name": schema_name,
+                    "enabled": schema_info.get("enabled", False),
+                    "tables": tables_list,
+                    "table_count": len(tables_list),
+                }
+            )
 
         logger.info(f"Retrieved schema status for connector: {connector_id}")
 
         return {
             "status": "success",
             "connector_id": connector_id,
+            "dashboard_url": _get_connector_url(connector_id),
             "schemas": schemas_list,
             "schema_count": len(schemas_list),
         }
@@ -317,13 +341,15 @@ async def list_hybrid_agents() -> Dict[str, Any]:
 
         processed = []
         for agent in agents:
-            processed.append({
-                "id": agent.get("id"),
-                "display_name": agent.get("display_name"),
-                "group_id": agent.get("group_id"),
-                "registered_at": agent.get("registered_at"),
-                "usage": agent.get("usage", []),
-            })
+            processed.append(
+                {
+                    "id": agent.get("id"),
+                    "display_name": agent.get("display_name"),
+                    "group_id": agent.get("group_id"),
+                    "registered_at": agent.get("registered_at"),
+                    "usage": agent.get("usage", []),
+                }
+            )
 
         logger.info(f"Listed {len(processed)} hybrid agents")
 
@@ -467,75 +493,93 @@ async def diagnose_connector(connector_id: str) -> Dict[str, Any]:
 
         # Check: Paused
         if paused:
-            issues.append({
-                "severity": "info",
-                "category": "status",
-                "issue": "Connector is paused",
-                "recommendation": "Resume the connector when ready to sync",
-            })
+            issues.append(
+                {
+                    "severity": "info",
+                    "category": "status",
+                    "issue": "Connector is paused",
+                    "recommendation": "Resume the connector when ready to sync",
+                }
+            )
 
         # Check: Setup state
         if setup_state in ["broken", "incomplete"]:
-            issues.append({
-                "severity": "high",
-                "category": "setup",
-                "issue": f"Setup is {setup_state}",
-                "recommendation": "Complete connector setup in Fivetran dashboard",
-            })
+            issues.append(
+                {
+                    "severity": "high",
+                    "category": "setup",
+                    "issue": f"Setup is {setup_state}",
+                    "recommendation": "Complete connector setup in Fivetran dashboard",
+                }
+            )
 
         # Check: Sync state
         if sync_state == "failed":
-            issues.append({
-                "severity": "high",
-                "category": "sync",
-                "issue": "Last sync failed",
-                "details": f"Failed {hours_since_failure} hours ago" if hours_since_failure else "Recently failed",
-                "recommendation": "Check Fivetran logs for error details. Common causes: auth expired, network issues, source unavailable",
-            })
+            issues.append(
+                {
+                    "severity": "high",
+                    "category": "sync",
+                    "issue": "Last sync failed",
+                    "details": f"Failed {hours_since_failure} hours ago"
+                    if hours_since_failure
+                    else "Recently failed",
+                    "recommendation": "Check Fivetran logs for error details. Common causes: auth expired, network issues, source unavailable",
+                }
+            )
         elif sync_state == "rescheduled":
-            issues.append({
-                "severity": "medium",
-                "category": "sync",
-                "issue": "Sync was rescheduled",
-                "recommendation": "Fivetran rescheduled due to a transient issue. Monitor next sync",
-            })
+            issues.append(
+                {
+                    "severity": "medium",
+                    "category": "sync",
+                    "issue": "Sync was rescheduled",
+                    "recommendation": "Fivetran rescheduled due to a transient issue. Monitor next sync",
+                }
+            )
 
         # Check: Warnings
         if warnings:
-            issues.append({
-                "severity": "medium",
-                "category": "warnings",
-                "issue": f"{len(warnings)} active warning(s)",
-                "details": warnings[:3],  # First 3 warnings
-                "recommendation": "Review and resolve warnings in Fivetran dashboard",
-            })
+            issues.append(
+                {
+                    "severity": "medium",
+                    "category": "warnings",
+                    "issue": f"{len(warnings)} active warning(s)",
+                    "details": warnings[:3],  # First 3 warnings
+                    "recommendation": "Review and resolve warnings in Fivetran dashboard",
+                }
+            )
 
         # Check: Recent failure
         if hours_since_failure and hours_since_failure < 24 and sync_state != "failed":
-            issues.append({
-                "severity": "low",
-                "category": "history",
-                "issue": f"Had a failure {hours_since_failure} hours ago",
-                "recommendation": "Monitor for recurring issues",
-            })
+            issues.append(
+                {
+                    "severity": "low",
+                    "category": "history",
+                    "issue": f"Had a failure {hours_since_failure} hours ago",
+                    "recommendation": "Monitor for recurring issues",
+                }
+            )
 
         # Check: No recent success
         if hours_since_success and hours_since_success > 48 and not paused:
-            issues.append({
-                "severity": "medium",
-                "category": "sync",
-                "issue": f"No successful sync in {hours_since_success} hours",
-                "recommendation": "Check if connector is stuck or having issues",
-            })
+            issues.append(
+                {
+                    "severity": "medium",
+                    "category": "sync",
+                    "issue": f"No successful sync in {hours_since_success} hours",
+                    "recommendation": "Check if connector is stuck or having issues",
+                }
+            )
 
         # Check: Many disabled tables
         if total_tables > 0 and disabled_tables > total_tables * 0.5:
-            issues.append({
-                "severity": "low",
-                "category": "schema",
-                "issue": f"{disabled_tables} of {total_tables} tables disabled",
-                "recommendation": "Verify table selection is intentional",
-            })
+            issues.append(
+                {
+                    "severity": "low",
+                    "category": "schema",
+                    "issue": f"{disabled_tables} of {total_tables} tables disabled",
+                    "recommendation": "Verify table selection is intentional",
+                }
+            )
 
         # Determine overall health
         if paused:
@@ -552,6 +596,7 @@ async def diagnose_connector(connector_id: str) -> Dict[str, Any]:
         return {
             "status": "success",
             "connector_id": connector_id,
+            "dashboard_url": _get_connector_url(connector_id),
             "overall_health": overall_health,
             "summary": {
                 "service": connector.get("service"),
@@ -572,7 +617,8 @@ async def diagnose_connector(connector_id: str) -> Dict[str, Any]:
                 "is_syncing": sync_state == "syncing",
                 "setup_complete": setup_state == "connected",
                 "has_warnings": len(warnings) > 0,
-                "has_recent_failure": hours_since_failure is not None and hours_since_failure < 24,
+                "has_recent_failure": hours_since_failure is not None
+                and hours_since_failure < 24,
                 "tables_total": total_tables,
                 "tables_enabled": enabled_tables,
                 "tables_disabled": disabled_tables,
