@@ -24,6 +24,41 @@ def _get_connector_url(connector_id: str) -> str:
     return f"{FIVETRAN_DASHBOARD_URL}/{connector_id}/status"
 
 
+async def _paginate(
+    client: Any, endpoint: str, params: Optional[Dict[str, Any]] = None
+) -> List[Dict[str, Any]]:
+    """Helper to fetch all pages from a paginated Fivetran API endpoint.
+
+    Args:
+        client: FivetranClient instance.
+        endpoint: API endpoint to fetch from.
+        params: Optional additional query parameters.
+
+    Returns:
+        List of all items from all pages.
+    """
+    all_items: List[Dict[str, Any]] = []
+    cursor = None
+
+    while True:
+        request_params = {**(params or {})}
+        if cursor:
+            request_params["cursor"] = cursor
+
+        response = await client.get(
+            endpoint, params=request_params if request_params else None
+        )
+        data = response.get("data", {})
+        items = data.get("items", [])
+        all_items.extend(items)
+
+        cursor = data.get("next_cursor")
+        if not cursor:
+            break
+
+    return all_items
+
+
 async def list_groups() -> Dict[str, Any]:
     """List all Fivetran groups (destinations).
 
@@ -38,9 +73,7 @@ async def list_groups() -> Dict[str, Any]:
     """
     try:
         client = get_fivetran_client()
-        response = await client.get("groups")
-
-        groups = response.get("data", {}).get("items", [])
+        groups = await _paginate(client, "groups")
 
         processed = [
             {
@@ -92,20 +125,20 @@ async def list_connectors(group_id: Optional[str] = None) -> Dict[str, Any]:
         client = get_fivetran_client()
 
         if group_id:
-            # Fetch from specific group
-            response = await client.get(f"groups/{group_id}/connectors")
-            all_connectors = response.get("data", {}).get("items", [])
+            # Fetch from specific group (with pagination)
+            endpoint = f"groups/{group_id}/connectors"
             filter_desc = f"group_id={group_id}"
         else:
-            # Fetch all connectors
-            response = await client.get("connectors")
-            all_connectors = response.get("data", {}).get("items", [])
+            # Fetch all connectors (with pagination)
+            endpoint = "connectors"
             filter_desc = "none"
+
+        all_connectors = await _paginate(client, endpoint)
 
         # Simplify connector info
         simplified = []
         for c in all_connectors:
-            connector_id = c.get("id")
+            connector_id = c.get("id", "")
             simplified.append(
                 {
                     "id": connector_id,
@@ -204,13 +237,13 @@ async def list_failed_connectors(group_id: Optional[str] = None) -> Dict[str, An
     try:
         client = get_fivetran_client()
 
-        # Fetch connectors
+        # Fetch connectors (with pagination)
         if group_id:
-            response = await client.get(f"groups/{group_id}/connectors")
-            all_connectors = response.get("data", {}).get("items", [])
+            endpoint = f"groups/{group_id}/connectors"
         else:
-            response = await client.get("connectors")
-            all_connectors = response.get("data", {}).get("items", [])
+            endpoint = "connectors"
+
+        all_connectors = await _paginate(client, endpoint)
 
         failed = []
         for c in all_connectors:
@@ -227,7 +260,7 @@ async def list_failed_connectors(group_id: Optional[str] = None) -> Dict[str, An
             )
 
             if has_issues:
-                connector_id = c.get("id")
+                connector_id = c.get("id", "")
                 failed.append(
                     {
                         "id": connector_id,
@@ -335,12 +368,10 @@ async def list_hybrid_agents() -> Dict[str, Any]:
     """
     try:
         client = get_fivetran_client()
-        response = await client.get("local-processing-agents")
-
-        agents = response.get("data", {}).get("items", [])
+        all_agents = await _paginate(client, "local-processing-agents")
 
         processed = []
-        for agent in agents:
+        for agent in all_agents:
             processed.append(
                 {
                     "id": agent.get("id"),
