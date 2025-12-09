@@ -12,8 +12,6 @@ from fivetran_mcp_server.tools.connectors import (
     get_connector_schema_status,
     get_hybrid_agent_details,
     list_connectors,
-    list_failed_connectors,
-    list_groups,
     list_hybrid_agents,
 )
 from fivetran_mcp_server.utils.pylogger import (
@@ -51,20 +49,16 @@ class FivetranMCPServer:
         """Register MCP tools for Fivetran troubleshooting (read-only).
 
         Tools:
-        - list_groups: List all groups/destinations
-        - list_connectors: List connectors (filter by group_id)
-        - list_failed_connectors: Find connectors with issues (filter by group_id)
+        - list_connectors: List connectors (filter by env and status)
         - get_connector_schema_status: See table-level sync status
         - diagnose_connector: Comprehensive health check with recommendations
         - list_hybrid_agents: List all hybrid deployment agents
         - get_hybrid_agent_details: Get details for a specific hybrid agent
         """
-        self.mcp.tool()(list_groups)
         self.mcp.tool()(list_connectors)
-        self.mcp.tool()(list_failed_connectors)
         self.mcp.tool()(get_connector_schema_status)
         self.mcp.tool()(diagnose_connector)
         self.mcp.tool()(list_hybrid_agents)
         self.mcp.tool()(get_hybrid_agent_details)
 
-        logger.info("Registered 7 Fivetran troubleshooting tools (read-only)")
+        logger.info("Registered 5 Fivetran troubleshooting tools (read-only)")

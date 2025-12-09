@@ -1,7 +1,7 @@
 """Fivetran connector tools for troubleshooting and diagnostics (read-only).
 
 This module provides read-only MCP tools for diagnosing Fivetran connector issues.
-Works with any Fivetran account - filter connectors by group_id.
+Works with any Fivetran account - filter connectors by env and status.
 """
 
 from datetime import datetime, timezone
@@ -17,6 +17,9 @@ logger = get_python_logger()
 
 # Fivetran dashboard base URL for connector links
 FIVETRAN_DASHBOARD_URL = "https://fivetran.com/dashboard/connectors"
+
+# Valid status filter values
+VALID_STATUSES = {"all", "failed", "healthy", "paused", "warning"}
 
 
 def _get_connector_url(connector_id: str) -> str:
@@ -59,104 +62,176 @@ async def _paginate(
     return all_items
 
 
-async def list_groups() -> Dict[str, Any]:
-    """List all Fivetran groups (destinations).
-
-    Retrieves all destination groups in your Fivetran account.
-    Use this to find group IDs for filtering connectors.
-
-    Returns:
-        Dict containing:
-            - status: "success" or "error"
-            - groups: List of groups with id, name, created_at
-            - count: Total number of groups
-    """
-    try:
-        client = get_fivetran_client()
-        groups = await _paginate(client, "groups")
-
-        processed = [
-            {
-                "id": g.get("id"),
-                "name": g.get("name"),
-                "created_at": g.get("created_at"),
-            }
-            for g in groups
-        ]
-
-        logger.info(f"Listed {len(processed)} groups")
-
-        return {
-            "status": "success",
-            "groups": processed,
-            "count": len(processed),
-        }
-
-    except ValueError as e:
-        logger.error(f"Configuration error: {e}")
-        return {"status": "error", "error": str(e)}
-    except Exception as e:
-        logger.error(f"Error listing groups: {e}")
-        return {"status": "error", "error": str(e)}
-
-
-async def list_connectors(group_id: Optional[str] = None) -> Dict[str, Any]:
-    """List Fivetran connectors, optionally filtered by group.
-
-    Retrieves connectors from your Fivetran account. Use group_id to filter
-    to a specific destination/group.
+async def _resolve_env_to_group_ids(
+    client: Any, env: str
+) -> tuple[List[str], List[str]]:
+    """Resolve environment name to group ID(s).
 
     Args:
-        group_id: Optional group ID to filter connectors. Use list_groups()
-                  to find available group IDs.
+        client: FivetranClient instance.
+        env: Environment name (e.g., "dev", "prod", "preprod", "sandbox")
+             or a group ID directly.
+
+    Returns:
+        Tuple of (group_ids, group_names) that match the env filter.
+    """
+    groups = await _paginate(client, "groups")
+
+    # Check if env is already a group ID
+    for g in groups:
+        if g.get("id") == env:
+            return [env], [g.get("name", "")]
+
+    # Search by partial match on group name (case-insensitive)
+    env_lower = env.lower()
+    matching_ids = []
+    matching_names = []
+    for g in groups:
+        name = g.get("name", "")
+        if env_lower in name.lower():
+            matching_ids.append(g.get("id", ""))
+            matching_names.append(name)
+
+    return matching_ids, matching_names
+
+
+def _get_connector_status(connector: Dict[str, Any]) -> str:
+    """Determine the status category for a connector.
+
+    Args:
+        connector: Raw connector data from Fivetran API.
+
+    Returns:
+        Status string: "failed", "warning", "paused", or "healthy"
+    """
+    status_info = connector.get("status", {})
+    sync_state = status_info.get("sync_state", "")
+    setup_state = status_info.get("setup_state", "")
+    warnings = status_info.get("warnings", [])
+    paused = connector.get("paused", False)
+
+    if paused:
+        return "paused"
+    if sync_state in ["failed", "rescheduled"] or setup_state in [
+        "broken",
+        "incomplete",
+    ]:
+        return "failed"
+    if warnings:
+        return "warning"
+    return "healthy"
+
+
+async def list_connectors(
+    env: Optional[str] = None, status: Optional[str] = None
+) -> Dict[str, Any]:
+    """List Fivetran connectors, filtered by environment and/or status.
+
+    Retrieves connectors from your Fivetran account with flexible filtering.
+
+    Args:
+        env: Optional environment filter. Use human-readable names like "dev",
+             "preprod", "prod", "sandbox" - matches against group names.
+             Can also use exact group ID.
+        status: Optional status filter. One of:
+             - "all": All connectors (default)
+             - "failed": Connectors with failures or broken setup
+             - "healthy": Connectors working normally
+             - "paused": Paused connectors
+             - "warning": Connectors with warnings
 
     Returns:
         Dict containing:
             - status: "success" or "error"
-            - connectors: List of connector summaries
+            - connectors: List of connector summaries with status info
             - count: Number of connectors returned
-            - group_id: The group filter applied (if any)
+            - filters: The filters applied (env, status)
 
     Examples:
-        list_connectors()  # All connectors
-        list_connectors(group_id="abc123")  # Connectors in specific group
+        list_connectors()                              # All connectors
+        list_connectors(env="prod")                    # All prod connectors
+        list_connectors(status="failed")              # All failed connectors
+        list_connectors(env="dev", status="failed")   # Failed dev connectors
     """
     try:
         client = get_fivetran_client()
 
-        if group_id:
-            # Fetch from specific group (with pagination)
-            endpoint = f"groups/{group_id}/connectors"
-            filter_desc = f"group_id={group_id}"
+        # Validate status filter
+        status_filter = (status or "all").lower()
+        if status_filter not in VALID_STATUSES:
+            return {
+                "status": "error",
+                "error": f"Invalid status '{status}'. Must be one of: {', '.join(VALID_STATUSES)}",
+            }
+
+        # Resolve environment to group IDs
+        group_ids: List[str] = []
+        env_names: List[str] = []
+        if env:
+            group_ids, env_names = await _resolve_env_to_group_ids(client, env)
+            if not group_ids:
+                return {
+                    "status": "error",
+                    "error": f"No groups found matching environment '{env}'",
+                }
+
+        # Fetch connectors
+        all_connectors: List[Dict[str, Any]] = []
+        if group_ids:
+            for gid in group_ids:
+                connectors = await _paginate(client, f"groups/{gid}/connectors")
+                all_connectors.extend(connectors)
         else:
-            # Fetch all connectors (with pagination)
-            endpoint = "connectors"
-            filter_desc = "none"
+            all_connectors = await _paginate(client, "connectors")
 
-        all_connectors = await _paginate(client, endpoint)
-
-        # Simplify connector info
-        simplified = []
+        # Process and filter connectors
+        results = []
         for c in all_connectors:
+            connector_status = _get_connector_status(c)
+
+            # Apply status filter
+            if status_filter != "all" and connector_status != status_filter:
+                continue
+
             connector_id = c.get("id", "")
-            simplified.append(
+            status_info = c.get("status", {})
+            warnings = status_info.get("warnings", [])
+
+            results.append(
                 {
                     "id": connector_id,
                     "service": c.get("service"),
                     "schema": c.get("schema"),
                     "group_id": c.get("group_id"),
+                    "connector_status": connector_status,
+                    "sync_state": status_info.get("sync_state"),
+                    "setup_state": status_info.get("setup_state"),
                     "paused": c.get("paused", False),
+                    "warning_count": len(warnings),
                     "dashboard_url": _get_connector_url(connector_id),
                 }
             )
 
-        logger.info(f"Listed {len(simplified)} connectors (filters: {filter_desc})")
+        filter_desc = []
+        if env:
+            filter_desc.append(f"env={env} ({', '.join(env_names)})")
+        if status_filter != "all":
+            filter_desc.append(f"status={status_filter}")
+
+        logger.info(
+            f"Listed {len(results)} connectors "
+            f"(filters: {', '.join(filter_desc) if filter_desc else 'none'})"
+        )
 
         return {
             "status": "success",
-            "connectors": simplified,
-            "count": len(simplified),
-            "group_id": group_id,
+            "connectors": results,
+            "count": len(results),
+            "filters": {
+                "env": env,
+                "env_groups": env_names if env else None,
+                "status": status_filter,
+            },
         }
 
     except ValueError as e:
@@ -164,82 +239,6 @@ async def list_connectors(group_id: Optional[str] = None) -> Dict[str, Any]:
         return {"status": "error", "error": str(e)}
     except Exception as e:
         logger.error(f"Error listing connectors: {e}")
-        return {"status": "error", "error": str(e)}
-
-
-async def list_failed_connectors(group_id: Optional[str] = None) -> Dict[str, Any]:
-    """List connectors with failures or warnings, optionally filtered by group.
-
-    Quickly identifies problem connectors by filtering for those with:
-    - Failed or rescheduled sync state
-    - Broken or incomplete setup state
-    - Active warnings
-
-    Args:
-        group_id: Optional group ID to filter. Use list_groups() to find IDs.
-
-    Returns:
-        Dict containing:
-            - status: "success" or "error"
-            - failed_connectors: List of connectors with issues
-            - count: Number of problem connectors found
-            - group_id: The group filter applied (if any)
-    """
-    try:
-        client = get_fivetran_client()
-
-        # Fetch connectors (with pagination)
-        if group_id:
-            endpoint = f"groups/{group_id}/connectors"
-        else:
-            endpoint = "connectors"
-
-        all_connectors = await _paginate(client, endpoint)
-
-        failed = []
-        for c in all_connectors:
-            status_info = c.get("status", {})
-            sync_state = status_info.get("sync_state", "")
-            setup_state = status_info.get("setup_state", "")
-            warnings = status_info.get("warnings", [])
-
-            # Check for actual problems (not just paused)
-            has_issues = (
-                sync_state in ["failed", "rescheduled"]
-                or setup_state in ["broken", "incomplete"]
-                or len(warnings) > 0
-            )
-
-            if has_issues:
-                connector_id = c.get("id", "")
-                failed.append(
-                    {
-                        "id": connector_id,
-                        "service": c.get("service"),
-                        "schema": c.get("schema"),
-                        "group_id": c.get("group_id"),
-                        "sync_state": sync_state,
-                        "setup_state": setup_state,
-                        "warning_count": len(warnings),
-                        "warnings": warnings[:3],
-                        "dashboard_url": _get_connector_url(connector_id),
-                    }
-                )
-
-        logger.info(f"Found {len(failed)} connectors with issues")
-
-        return {
-            "status": "success",
-            "failed_connectors": failed,
-            "count": len(failed),
-            "group_id": group_id,
-        }
-
-    except ValueError as e:
-        logger.error(f"Configuration error: {e}")
-        return {"status": "error", "error": str(e)}
-    except Exception as e:
-        logger.error(f"Error listing failed connectors: {e}")
         return {"status": "error", "error": str(e)}
 
 
@@ -305,40 +304,124 @@ async def get_connector_schema_status(connector_id: str) -> Dict[str, Any]:
         return {"status": "error", "error": str(e)}
 
 
-async def list_hybrid_agents() -> Dict[str, Any]:
-    """List all Hybrid Deployment Agents and their status.
+# Valid status filter values for hybrid agents
+VALID_AGENT_STATUSES = {"all", "live", "offline"}
 
-    Shows all Local Processing Agents (hybrid agents) in your account,
-    including their connection status, version, and health.
+
+async def list_hybrid_agents(
+    env: Optional[str] = None, status: Optional[str] = None
+) -> Dict[str, Any]:
+    """List Hybrid Deployment Agents, filtered by environment and/or status.
+
+    Shows Local Processing Agents (hybrid agents) in your account,
+    including their connection status and health.
+
+    Args:
+        env: Optional environment filter. Use human-readable names like "dev",
+             "preprod", "prod", "sandbox" - matches against group names.
+        status: Optional status filter. One of:
+             - "all": All agents (default)
+             - "live": Online/connected agents
+             - "offline": Offline/disconnected agents
 
     Returns:
         Dict containing:
             - status: "success" or "error"
-            - agents: List of agents with id, display_name, registered_at, status
+            - agents: List of agents with id, display_name, status info
             - count: Total number of agents
+            - filters: The filters applied (env, status)
+
+    Examples:
+        list_hybrid_agents()                          # All agents
+        list_hybrid_agents(env="prod")                # All prod agents
+        list_hybrid_agents(status="offline")          # All offline agents
+        list_hybrid_agents(env="prod", status="live") # Live prod agents
     """
     try:
         client = get_fivetran_client()
+
+        # Validate status filter
+        status_filter = (status or "all").lower()
+        if status_filter not in VALID_AGENT_STATUSES:
+            return {
+                "status": "error",
+                "error": f"Invalid status '{status}'. Must be one of: {', '.join(VALID_AGENT_STATUSES)}",
+            }
+
+        # Resolve environment to group IDs
+        group_ids: List[str] = []
+        env_names: List[str] = []
+        if env:
+            group_ids, env_names = await _resolve_env_to_group_ids(client, env)
+            if not group_ids:
+                return {
+                    "status": "error",
+                    "error": f"No groups found matching environment '{env}'",
+                }
+
+        # Fetch all agents
         all_agents = await _paginate(client, "local-processing-agents")
 
-        processed = []
+        # Process and filter agents
+        results = []
         for agent in all_agents:
-            processed.append(
+            agent_group_id = agent.get("group_id", "")
+
+            # Apply env filter
+            if group_ids and agent_group_id not in group_ids:
+                continue
+
+            # Get detailed info to check online status (needed for status filter)
+            agent_id = agent.get("id", "")
+            agent_status = "unknown"
+
+            # Fetch agent details to get online status
+            try:
+                detail_response = await client.get(
+                    f"local-processing-agents/{agent_id}"
+                )
+                agent_detail = detail_response.get("data", {})
+                is_online = agent_detail.get("online", False)
+                agent_status = "live" if is_online else "offline"
+            except Exception:
+                # If we can't get details, mark as unknown
+                agent_status = "unknown"
+
+            # Apply status filter
+            if status_filter != "all" and agent_status != status_filter:
+                continue
+
+            results.append(
                 {
-                    "id": agent.get("id"),
+                    "id": agent_id,
                     "display_name": agent.get("display_name"),
-                    "group_id": agent.get("group_id"),
+                    "group_id": agent_group_id,
+                    "agent_status": agent_status,
                     "registered_at": agent.get("registered_at"),
-                    "usage": agent.get("usage", []),
+                    "connector_count": len(agent.get("usage", [])),
                 }
             )
 
-        logger.info(f"Listed {len(processed)} hybrid agents")
+        filter_desc = []
+        if env:
+            filter_desc.append(f"env={env} ({', '.join(env_names)})")
+        if status_filter != "all":
+            filter_desc.append(f"status={status_filter}")
+
+        logger.info(
+            f"Listed {len(results)} hybrid agents "
+            f"(filters: {', '.join(filter_desc) if filter_desc else 'none'})"
+        )
 
         return {
             "status": "success",
-            "agents": processed,
-            "count": len(processed),
+            "agents": results,
+            "count": len(results),
+            "filters": {
+                "env": env,
+                "env_groups": env_names if env else None,
+                "status": status_filter,
+            },
         }
 
     except ValueError as e:

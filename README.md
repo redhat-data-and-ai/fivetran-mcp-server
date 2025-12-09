@@ -13,13 +13,25 @@ A read-only MCP (Model Context Protocol) server for troubleshooting and diagnosi
 
 | Tool | Description |
 |------|-------------|
-| `list_groups()` | List all Fivetran groups/destinations |
-| `list_connectors(group_id?)` | List connectors, optionally filtered by group |
-| `list_failed_connectors(group_id?)` | Find connectors with issues |
+| `list_connectors(env?, status?)` | List connectors filtered by environment and/or status |
+| `list_hybrid_agents(env?, status?)` | List hybrid agents filtered by environment and/or status |
 | `get_connector_schema_status(connector_id)` | Get table-level sync status |
 | `diagnose_connector(connector_id)` | **Smart** health check with recommendations |
-| `list_hybrid_agents()` | List all Hybrid Deployment Agents and their status |
 | `get_hybrid_agent_details(agent_id)` | Get details for a specific hybrid agent |
+
+### list_connectors Parameters
+
+| Parameter | Values | Description |
+|-----------|--------|-------------|
+| `env` | `"dev"`, `"preprod"`, `"prod"`, `"sandbox"`, etc. | Filter by environment (partial match on group name) |
+| `status` | `"all"`, `"failed"`, `"healthy"`, `"paused"`, `"warning"` | Filter by connector health |
+
+### list_hybrid_agents Parameters
+
+| Parameter | Values | Description |
+|-----------|--------|-------------|
+| `env` | `"dev"`, `"preprod"`, `"prod"`, `"sandbox"`, etc. | Filter by environment (partial match on group name) |
+| `status` | `"all"`, `"live"`, `"offline"` | Filter by agent connection status |
 
 ## Quick Start
 
@@ -112,19 +124,21 @@ list_groups()
 list_connectors()
 ```
 
-### List connectors in a specific group
+### List connectors by environment
 ```
-list_connectors(group_id="abc123")
-```
-
-### Find failed connectors
-```
-list_failed_connectors()
+list_connectors(env="prod")
+list_connectors(env="preprod")
+list_connectors(env="dev")
 ```
 
-### Find failed connectors in a specific group
+### List failed connectors
 ```
-list_failed_connectors(group_id="abc123")
+list_connectors(status="failed")
+```
+
+### List failed connectors in a specific environment
+```
+list_connectors(env="prod", status="failed")
 ```
 
 ### Diagnose a connector (health check with recommendations)
@@ -140,6 +154,9 @@ get_connector_schema_status(connector_id="abc123")
 ### List hybrid deployment agents
 ```
 list_hybrid_agents()
+list_hybrid_agents(env="prod")
+list_hybrid_agents(status="offline")
+list_hybrid_agents(env="prod", status="live")
 ```
 
 ### Get hybrid agent details

@@ -6,12 +6,10 @@ All Fivetran troubleshooting tools are implemented here.
 
 | Tool | File | Description |
 |------|------|-------------|
-| `list_groups` | `connectors.py` | List all groups/destinations |
-| `list_connectors` | `connectors.py` | List connectors (filter by group_id) |
-| `list_failed_connectors` | `connectors.py` | Find problem connectors |
+| `list_connectors` | `connectors.py` | List connectors (filter by env and status) |
 | `get_connector_schema_status` | `connectors.py` | Table-level sync status |
 | `diagnose_connector` | `connectors.py` | Smart health check with recommendations |
-| `list_hybrid_agents` | `connectors.py` | List all hybrid deployment agents |
+| `list_hybrid_agents` | `connectors.py` | List hybrid agents (filter by env and status) |
 | `get_hybrid_agent_details` | `connectors.py` | Get hybrid agent details |
 
 ## Adding New Tools
