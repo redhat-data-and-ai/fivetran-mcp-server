@@ -167,55 +167,6 @@ async def list_connectors(group_id: Optional[str] = None) -> Dict[str, Any]:
         return {"status": "error", "error": str(e)}
 
 
-async def get_connector_details(connector_id: str) -> Dict[str, Any]:
-    """Get comprehensive details for a connector (for troubleshooting).
-
-    Retrieves full connector information including configuration,
-    sync status, last sync times, and any warnings or failures.
-
-    Args:
-        connector_id: The unique identifier for the connector.
-
-    Returns:
-        Dict containing connector details including service, schema,
-        sync state, succeeded_at, failed_at, warnings, etc.
-    """
-    try:
-        client = get_fivetran_client()
-        response = await client.get(f"connectors/{connector_id}")
-
-        c = response.get("data", {})
-        status_info = c.get("status", {})
-
-        logger.info(f"Retrieved details for connector: {connector_id}")
-
-        return {
-            "status": "success",
-            "connector_id": connector_id,
-            "dashboard_url": _get_connector_url(connector_id),
-            "service": c.get("service"),
-            "schema": c.get("schema"),
-            "group_id": c.get("group_id"),
-            "paused": c.get("paused", False),
-            "sync_state": status_info.get("sync_state"),
-            "setup_state": status_info.get("setup_state"),
-            "succeeded_at": c.get("succeeded_at"),
-            "failed_at": c.get("failed_at"),
-            "sync_frequency": c.get("sync_frequency"),
-            "schedule_type": c.get("schedule_type"),
-            "warnings": status_info.get("warnings", []),
-            "tasks": status_info.get("tasks", []),
-            "failure_reason": c.get("failure_reason"),
-        }
-
-    except ValueError as e:
-        logger.error(f"Configuration error: {e}")
-        return {"status": "error", "error": str(e)}
-    except Exception as e:
-        logger.error(f"Error getting connector {connector_id}: {e}")
-        return {"status": "error", "error": str(e)}
-
-
 async def list_failed_connectors(group_id: Optional[str] = None) -> Dict[str, Any]:
     """List connectors with failures or warnings, optionally filtered by group.
 

@@ -15,12 +15,11 @@ A read-only MCP (Model Context Protocol) server for troubleshooting and diagnosi
 |------|-------------|
 | `list_groups()` | List all Fivetran groups/destinations |
 | `list_connectors(group_id?)` | List connectors, optionally filtered by group |
-| `get_connector_details(connector_id)` | Get full connector details for troubleshooting |
 | `list_failed_connectors(group_id?)` | Find connectors with issues |
 | `get_connector_schema_status(connector_id)` | Get table-level sync status |
+| `diagnose_connector(connector_id)` | **Smart** health check with recommendations |
 | `list_hybrid_agents()` | List all Hybrid Deployment Agents and their status |
 | `get_hybrid_agent_details(agent_id)` | Get details for a specific hybrid agent |
-| `diagnose_connector(connector_id)` | **Smart** health check with recommendations |
 
 ## Quick Start
 
@@ -128,9 +127,9 @@ list_failed_connectors()
 list_failed_connectors(group_id="abc123")
 ```
 
-### Get connector details
+### Diagnose a connector (health check with recommendations)
 ```
-get_connector_details(connector_id="abc123")
+diagnose_connector(connector_id="abc123")
 ```
 
 ### Check table sync status
