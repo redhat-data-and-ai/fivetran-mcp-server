@@ -234,6 +234,8 @@ async def list_connectors(
             },
         }
 
+    except FivetranAPIError as e:
+        return e.to_dict()
     except ValueError as e:
         logger.error(f"Configuration error: {e}")
         return {"status": "error", "error": str(e)}
@@ -256,7 +258,17 @@ async def get_connector_schema_status(connector_id: str) -> Dict[str, Any]:
             - status: "success" or "error"
             - connector_id: The connector ID
             - schemas: List of schemas with their tables and sync status
+            - summary: Quick stats (total/enabled/disabled tables)
     """
+    # Input validation
+    if not connector_id or not connector_id.strip():
+        return {
+            "status": "error",
+            "error": "connector_id is required and cannot be empty",
+        }
+
+    connector_id = connector_id.strip()
+
     try:
         client = get_fivetran_client()
         response = await client.get(f"connectors/{connector_id}/schemas")
@@ -264,15 +276,23 @@ async def get_connector_schema_status(connector_id: str) -> Dict[str, Any]:
         schemas_data = response.get("data", {}).get("schemas", {})
 
         schemas_list: List[Dict[str, Any]] = []
+        total_tables = 0
+        enabled_tables = 0
+
         for schema_name, schema_info in schemas_data.items():
             tables_list = []
             tables = schema_info.get("tables", {})
 
             for table_name, table_info in tables.items():
+                is_enabled = table_info.get("enabled", False)
+                total_tables += 1
+                if is_enabled:
+                    enabled_tables += 1
+
                 tables_list.append(
                     {
                         "name": table_name,
-                        "enabled": table_info.get("enabled", False),
+                        "enabled": is_enabled,
                         "sync_mode": table_info.get("sync_mode"),
                     }
                 )
@@ -283,6 +303,7 @@ async def get_connector_schema_status(connector_id: str) -> Dict[str, Any]:
                     "enabled": schema_info.get("enabled", False),
                     "tables": tables_list,
                     "table_count": len(tables_list),
+                    "enabled_count": sum(1 for t in tables_list if t["enabled"]),
                 }
             )
 
@@ -294,8 +315,15 @@ async def get_connector_schema_status(connector_id: str) -> Dict[str, Any]:
             "dashboard_url": _get_connector_url(connector_id),
             "schemas": schemas_list,
             "schema_count": len(schemas_list),
+            "summary": {
+                "total_tables": total_tables,
+                "enabled_tables": enabled_tables,
+                "disabled_tables": total_tables - enabled_tables,
+            },
         }
 
+    except FivetranAPIError as e:
+        return e.to_dict()
     except ValueError as e:
         logger.error(f"Configuration error: {e}")
         return {"status": "error", "error": str(e)}
@@ -362,41 +390,47 @@ async def list_hybrid_agents(
         # Fetch all agents
         all_agents = await _paginate(client, "local-processing-agents")
 
-        # Process and filter agents
-        results = []
+        # First pass: filter by env (no API calls needed)
+        filtered_agents = []
         for agent in all_agents:
             agent_group_id = agent.get("group_id", "")
-
-            # Apply env filter
             if group_ids and agent_group_id not in group_ids:
                 continue
+            filtered_agents.append(agent)
 
-            # Get detailed info to check online status (needed for status filter)
+        # Only fetch agent details if status filter requires it
+        # This avoids N+1 API calls when status="all"
+        need_status_check = status_filter != "all"
+
+        results = []
+        for agent in filtered_agents:
             agent_id = agent.get("id", "")
+            agent_group_id = agent.get("group_id", "")
             agent_status = "unknown"
 
-            # Fetch agent details to get online status
-            try:
-                detail_response = await client.get(
-                    f"local-processing-agents/{agent_id}"
-                )
-                agent_detail = detail_response.get("data", {})
-                is_online = agent_detail.get("online", False)
-                agent_status = "live" if is_online else "offline"
-            except Exception:
-                # If we can't get details, mark as unknown
-                agent_status = "unknown"
+            # Only fetch details if we need to check online status
+            if need_status_check:
+                try:
+                    detail_response = await client.get(
+                        f"local-processing-agents/{agent_id}"
+                    )
+                    agent_detail = detail_response.get("data", {})
+                    is_online = agent_detail.get("online", False)
+                    agent_status = "live" if is_online else "offline"
 
-            # Apply status filter
-            if status_filter != "all" and agent_status != status_filter:
-                continue
+                    # Apply status filter
+                    if agent_status != status_filter:
+                        continue
+                except FivetranAPIError:
+                    # Skip agents we can't get details for when filtering
+                    continue
 
             results.append(
                 {
                     "id": agent_id,
                     "display_name": agent.get("display_name"),
                     "group_id": agent_group_id,
-                    "agent_status": agent_status,
+                    "agent_status": agent_status if need_status_check else "unknown",
                     "registered_at": agent.get("registered_at"),
                     "connector_count": len(agent.get("usage", [])),
                 }
@@ -424,6 +458,8 @@ async def list_hybrid_agents(
             },
         }
 
+    except FivetranAPIError as e:
+        return e.to_dict()
     except ValueError as e:
         logger.error(f"Configuration error: {e}")
         return {"status": "error", "error": str(e)}
@@ -447,14 +483,25 @@ async def get_hybrid_agent_details(agent_id: str) -> Dict[str, Any]:
             - agent_id: The agent ID
             - display_name: Human-readable agent name
             - group_id: Associated group/destination
+            - agent_status: "live" or "offline"
             - registered_at: When the agent was registered
             - usage: List of connectors using this agent
     """
+    # Input validation
+    if not agent_id or not agent_id.strip():
+        return {
+            "status": "error",
+            "error": "agent_id is required and cannot be empty",
+        }
+
+    agent_id = agent_id.strip()
+
     try:
         client = get_fivetran_client()
         response = await client.get(f"local-processing-agents/{agent_id}")
 
         agent = response.get("data", {})
+        is_online = agent.get("online", False)
 
         logger.info(f"Retrieved details for hybrid agent: {agent_id}")
 
@@ -463,8 +510,9 @@ async def get_hybrid_agent_details(agent_id: str) -> Dict[str, Any]:
             "agent_id": agent_id,
             "display_name": agent.get("display_name"),
             "group_id": agent.get("group_id"),
+            "agent_status": "live" if is_online else "offline",
             "registered_at": agent.get("registered_at"),
-            "files": agent.get("files", []),
+            "connector_count": len(agent.get("usage", [])),
             "usage": agent.get("usage", []),
         }
 
@@ -518,6 +566,15 @@ async def diagnose_connector(connector_id: str) -> Dict[str, Any]:
             - issues: List of issues with severity and recommendations
             - checks: Detailed check results
     """
+    # Input validation
+    if not connector_id or not connector_id.strip():
+        return {
+            "status": "error",
+            "error": "connector_id is required and cannot be empty",
+        }
+
+    connector_id = connector_id.strip()
+
     try:
         client = get_fivetran_client()
 
