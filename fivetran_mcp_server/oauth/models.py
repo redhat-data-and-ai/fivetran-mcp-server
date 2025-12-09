@@ -4,7 +4,7 @@ from typing import Optional, Union
 
 from pydantic import BaseModel, Field
 
-from fivetran_mcp_server.src.settings import settings
+from fivetran_mcp_server.settings import settings
 
 
 class TokenRequestBase(BaseModel):

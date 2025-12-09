@@ -13,7 +13,7 @@ from typing import Any, Dict, Optional
 import httpx
 from requests_oauthlib import OAuth2Session
 
-from fivetran_mcp_server.src.settings import settings
+from fivetran_mcp_server.settings import settings
 from fivetran_mcp_server.utils.pylogger import get_python_logger
 
 logger = get_python_logger()

@@ -5,9 +5,9 @@ from typing import NoReturn
 
 import uvicorn
 
-from fivetran_mcp_server.src.api import app
-from fivetran_mcp_server.src.settings import settings
-from fivetran_mcp_server.src.settings import validate_config as validate_config_func
+from fivetran_mcp_server.api import app
+from fivetran_mcp_server.settings import settings
+from fivetran_mcp_server.settings import validate_config as validate_config_func
 from fivetran_mcp_server.utils.pylogger import get_python_logger, get_uvicorn_log_config
 
 # Initialize logger

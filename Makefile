@@ -43,7 +43,7 @@ local:
 	@echo "Starting MCP server locally on port 5001..."
 	@echo "Health check available at: http://localhost:5001/health"
 	@echo "Press Ctrl+C to stop the server"
-	@. .venv/bin/activate && python -m fivetran_mcp_server.src.main
+	@. .venv/bin/activate && python -m fivetran_mcp_server.main
 
 container:
 	export PODMAN_COMPOSE_SILENT=true

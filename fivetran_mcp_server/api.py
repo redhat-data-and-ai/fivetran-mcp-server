@@ -15,11 +15,11 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 
-from fivetran_mcp_server.src.mcp import FivetranMCPServer
-from fivetran_mcp_server.src.oauth.handler import OAuth2Handler
-from fivetran_mcp_server.src.oauth.routes import register_oauth_routes
-from fivetran_mcp_server.src.oauth.service import OAuthService
-from fivetran_mcp_server.src.settings import settings
+from fivetran_mcp_server.mcp import FivetranMCPServer
+from fivetran_mcp_server.oauth.handler import OAuth2Handler
+from fivetran_mcp_server.oauth.routes import register_oauth_routes
+from fivetran_mcp_server.oauth.service import OAuthService
+from fivetran_mcp_server.settings import settings
 from fivetran_mcp_server.utils.pylogger import get_python_logger
 
 logger = get_python_logger(settings.PYTHON_LOG_LEVEL)
@@ -48,7 +48,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("Initializing storage service...")
     try:
         if settings.ENABLE_AUTH:
-            from fivetran_mcp_server.src.oauth.service import initialize_storage
+            from fivetran_mcp_server.oauth.service import initialize_storage
 
             storage_service = await initialize_storage()
             logger.info("Storage service initialized successfully")
@@ -67,7 +67,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Cleanup storage service
     logger.info("Shutting down storage service...")
     try:
-        from fivetran_mcp_server.src.oauth.service import cleanup_storage
+        from fivetran_mcp_server.oauth.service import cleanup_storage
 
         await cleanup_storage()
         oauth_service_instance = None
@@ -186,7 +186,7 @@ class LocalDevelopmentAuthorizationMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         try:
-            from fivetran_mcp_server.src.oauth.handler import OAuth2Handler
+            from fivetran_mcp_server.oauth.handler import OAuth2Handler
 
             authorization_url, state = OAuth2Handler.get_authorization_url()
 

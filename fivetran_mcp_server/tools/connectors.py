@@ -7,7 +7,7 @@ Works with any Fivetran account - filter connectors by group_id.
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from fivetran_mcp_server.src.fivetran_client import (
+from fivetran_mcp_server.fivetran_client import (
     FivetranAPIError,
     get_fivetran_client,
 )

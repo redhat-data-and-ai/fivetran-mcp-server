@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pytest
 
-from fivetran_mcp_server.src.settings import Settings, validate_config
+from fivetran_mcp_server.settings import Settings, validate_config
 
 
 class TestSettings:

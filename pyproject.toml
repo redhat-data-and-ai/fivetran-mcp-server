@@ -42,7 +42,7 @@ dev = [
 ]
 
 [project.scripts]
-fivetran-mcp-server = "fivetran_mcp_server.src.main:main"
+fivetran-mcp-server = "fivetran_mcp_server.main:main"
 
 [project.urls]
 Homepage = "https://github.com/robrien/fivetran-mcp-server"
