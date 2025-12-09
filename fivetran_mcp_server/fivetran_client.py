@@ -11,7 +11,7 @@ from typing import Any, Dict, Optional
 
 import httpx
 
-from fivetran_mcp_server.src.settings import settings
+from fivetran_mcp_server.settings import settings
 from fivetran_mcp_server.utils.pylogger import get_python_logger
 
 logger = get_python_logger()
@@ -27,6 +27,7 @@ class FivetranAPIError(Exception):
         hint: str = "",
         docs: str = "",
     ):
+        """Initialize the FivetranAPIError with status code and message."""
         self.status_code = status_code
         self.message = message
         self.hint = hint
@@ -103,7 +104,7 @@ class FivetranClient:
             FivetranAPIError: With helpful error message and hints.
         """
         status = response.status_code
-        
+
         error_messages = {
             401: {
                 "error": "Authentication failed",
@@ -154,7 +155,9 @@ class FivetranClient:
                 docs="https://fivetran.com/docs/rest-api/api-reference",
             )
 
-    async def get(self, endpoint: str, params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    async def get(
+        self, endpoint: str, params: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """Make a GET request to the Fivetran API.
 
         Args:
@@ -259,4 +262,3 @@ def get_fivetran_client() -> FivetranClient:
     if _client is None:
         _client = FivetranClient()
     return _client
-

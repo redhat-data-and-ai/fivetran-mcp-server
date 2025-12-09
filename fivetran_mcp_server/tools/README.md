@@ -24,10 +24,10 @@ All Fivetran troubleshooting tools are implemented here.
 ```python
 async def your_tool(param: str) -> Dict[str, Any]:
     """Tool description.
-    
+
     Args:
         param: Parameter description.
-        
+
     Returns:
         Dict with status and results.
     """

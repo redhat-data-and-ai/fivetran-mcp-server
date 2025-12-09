@@ -6,8 +6,8 @@ tools for MCP clients. It uses FastMCP to register and manage MCP capabilities.
 
 from fastmcp import FastMCP
 
-from fivetran_mcp_server.src.settings import settings
-from fivetran_mcp_server.src.tools.connectors import (
+from fivetran_mcp_server.settings import settings
+from fivetran_mcp_server.tools.connectors import (
     diagnose_connector,
     get_connector_details,
     get_connector_schema_status,

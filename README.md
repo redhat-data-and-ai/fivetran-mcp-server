@@ -49,10 +49,10 @@ cp .env.example .env
 ENABLE_AUTH=false \
 FIVETRAN_API_KEY="your-key" \
 FIVETRAN_API_SECRET="your-secret" \
-uv run python -m fivetran_mcp_server.src.main
+uv run python -m fivetran_mcp_server.main
 
 # Option 2: Using .env file (after configuring it)
-uv run python -m fivetran_mcp_server.src.main
+uv run python -m fivetran_mcp_server.main
 ```
 
 The server starts at `http://localhost:8080`
@@ -160,18 +160,20 @@ Returns overall health status, issues with severity levels, and actionable recom
 ```
 fivetran-mcp-server/
 ├── fivetran_mcp_server/
-│   ├── src/
-│   │   ├── main.py              # Entry point
-│   │   ├── api.py               # FastAPI app
-│   │   ├── mcp.py               # MCP server & tool registration
-│   │   ├── settings.py          # Configuration
-│   │   ├── fivetran_client.py   # Fivetran API client
-│   │   └── tools/
-│   │       └── connectors.py    # Connector tools
+│   ├── main.py              # Entry point
+│   ├── api.py               # FastAPI app
+│   ├── mcp.py               # MCP server & tool registration
+│   ├── settings.py          # Configuration
+│   ├── fivetran_client.py   # Fivetran API client
+│   ├── oauth/               # OAuth 2.0 (when ENABLE_AUTH=true)
+│   ├── storage/             # PostgreSQL storage
+│   ├── tools/
+│   │   └── connectors.py    # Connector tools
 │   └── utils/
-│       └── pylogger.py          # Logging
-├── .env.example                  # Environment template
-├── pyproject.toml               # Dependencies
+│       └── pylogger.py      # Logging
+├── tests/                   # Test suite
+├── .env.example             # Environment template
+├── pyproject.toml           # Dependencies
 └── README.md
 ```
 

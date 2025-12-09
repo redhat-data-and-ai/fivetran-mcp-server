@@ -4,16 +4,16 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from fivetran_mcp_server.src.mcp import FivetranMCPServer
+from fivetran_mcp_server.mcp import FivetranMCPServer
 
 
 class TestFivetranMCPServer:
     """Test the FivetranMCPServer class."""
 
-    @patch("fivetran_mcp_server.src.mcp.force_reconfigure_all_loggers")
-    @patch("fivetran_mcp_server.src.mcp.settings")
-    @patch("fivetran_mcp_server.src.mcp.FastMCP")
-    @patch("fivetran_mcp_server.src.mcp.logger")
+    @patch("fivetran_mcp_server.mcp.force_reconfigure_all_loggers")
+    @patch("fivetran_mcp_server.mcp.settings")
+    @patch("fivetran_mcp_server.mcp.FastMCP")
+    @patch("fivetran_mcp_server.mcp.logger")
     def test_init_success(
         self, mock_logger, mock_fastmcp, mock_settings, mock_force_reconfigure
     ):
@@ -32,10 +32,10 @@ class TestFivetranMCPServer:
             "Fivetran MCP Server initialized successfully"
         )
 
-    @patch("fivetran_mcp_server.src.mcp.force_reconfigure_all_loggers")
-    @patch("fivetran_mcp_server.src.mcp.settings")
-    @patch("fivetran_mcp_server.src.mcp.FastMCP")
-    @patch("fivetran_mcp_server.src.mcp.logger")
+    @patch("fivetran_mcp_server.mcp.force_reconfigure_all_loggers")
+    @patch("fivetran_mcp_server.mcp.settings")
+    @patch("fivetran_mcp_server.mcp.FastMCP")
+    @patch("fivetran_mcp_server.mcp.logger")
     def test_init_failure(
         self, mock_logger, mock_fastmcp, mock_settings, mock_force_reconfigure
     ):
@@ -52,9 +52,9 @@ class TestFivetranMCPServer:
             "Failed to initialize Fivetran MCP Server: Test error"
         )
 
-    @patch("fivetran_mcp_server.src.mcp.force_reconfigure_all_loggers")
-    @patch("fivetran_mcp_server.src.mcp.settings")
-    @patch("fivetran_mcp_server.src.mcp.FastMCP")
+    @patch("fivetran_mcp_server.mcp.force_reconfigure_all_loggers")
+    @patch("fivetran_mcp_server.mcp.settings")
+    @patch("fivetran_mcp_server.mcp.FastMCP")
     def test_register_mcp_tools(
         self, mock_fastmcp, mock_settings, mock_force_reconfigure
     ):
@@ -75,9 +75,9 @@ class TestFivetranMCPServer:
         """Test that server has required attributes for tools-first architecture."""
         # Arrange & Act
         with (
-            patch("fivetran_mcp_server.src.mcp.settings") as mock_settings,
-            patch("fivetran_mcp_server.src.mcp.FastMCP"),
-            patch("fivetran_mcp_server.src.mcp.force_reconfigure_all_loggers"),
+            patch("fivetran_mcp_server.mcp.settings") as mock_settings,
+            patch("fivetran_mcp_server.mcp.FastMCP"),
+            patch("fivetran_mcp_server.mcp.force_reconfigure_all_loggers"),
         ):
             mock_settings.PYTHON_LOG_LEVEL = "INFO"
             server = FivetranMCPServer()
@@ -90,9 +90,9 @@ class TestFivetranMCPServer:
         """Test that server adheres to tools-first architecture by not having resource/prompt methods."""
         # Arrange & Act
         with (
-            patch("fivetran_mcp_server.src.mcp.settings") as mock_settings,
-            patch("fivetran_mcp_server.src.mcp.FastMCP"),
-            patch("fivetran_mcp_server.src.mcp.force_reconfigure_all_loggers"),
+            patch("fivetran_mcp_server.mcp.settings") as mock_settings,
+            patch("fivetran_mcp_server.mcp.FastMCP"),
+            patch("fivetran_mcp_server.mcp.force_reconfigure_all_loggers"),
         ):
             mock_settings.PYTHON_LOG_LEVEL = "INFO"
             server = FivetranMCPServer()

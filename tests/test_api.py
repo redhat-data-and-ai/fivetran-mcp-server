@@ -4,7 +4,7 @@ from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 
-from fivetran_mcp_server.src.api import app
+from fivetran_mcp_server.api import app
 
 
 class TestAPI:
@@ -58,7 +58,7 @@ class TestAPI:
         # Assert
         assert response.headers["content-type"] == "application/json"
 
-    @patch("fivetran_mcp_server.src.api.settings")
+    @patch("fivetran_mcp_server.api.settings")
     def test_health_endpoint_with_different_transport_protocols(self, mock_settings):
         """Test health endpoint with different transport protocols."""
         # Arrange
@@ -128,20 +128,20 @@ class TestAPI:
     def test_app_imports(self):
         """Test that all required modules are imported."""
         # This test ensures that the API module can be imported without errors
-        import fivetran_mcp_server.src.api
+        import fivetran_mcp_server.api
 
-        assert fivetran_mcp_server.src.api.app is not None
+        assert fivetran_mcp_server.api.app is not None
 
     def test_server_initialization(self):
         """Test that the server is properly initialized."""
         # Arrange & Act
-        from fivetran_mcp_server.src.api import server
+        from fivetran_mcp_server.api import server
 
         # Assert
         assert server is not None
         assert hasattr(server, "mcp")
 
-    @patch("fivetran_mcp_server.src.api.settings")
+    @patch("fivetran_mcp_server.api.settings")
     def test_transport_protocol_configuration(self, mock_settings):
         """Test that different transport protocols are handled correctly."""
         # Test SSE protocol
@@ -150,7 +150,7 @@ class TestAPI:
         # Re-import to test SSE configuration
         import importlib
 
-        import fivetran_mcp_server.src.api as api_module
+        import fivetran_mcp_server.api as api_module
 
         importlib.reload(api_module)
 

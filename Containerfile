@@ -35,4 +35,4 @@ ENV PYTHONPATH=/app
 # add entrypoint for the container
 # --------------------------------------------------------------------------------------------------
 
-CMD ["/app/.venv/bin/python", "-m", "fivetran_mcp_server.src.main"]
+CMD ["/app/.venv/bin/python", "-m", "fivetran_mcp_server.main"]
