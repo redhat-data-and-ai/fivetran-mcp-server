@@ -20,7 +20,6 @@ dist/
 *~
 
 # Development and documentation
-README.md
 LICENSE
 Makefile
 .pre-commit-config.yaml

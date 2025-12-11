@@ -7,29 +7,29 @@ FROM registry.access.redhat.com/ubi9/python-312:latest
 WORKDIR /app
 
 # --------------------------------------------------------------------------------------------------
-# Copy manifest files and install python packages
+# Install uv and create virtual environment
 # --------------------------------------------------------------------------------------------------
 
 USER root
-COPY pyproject.toml /app/pyproject.toml
-RUN pip install uv
-RUN uv venv
-RUN source /app/.venv/bin/activate
-RUN uv pip install -r pyproject.toml
-USER default
+RUN pip install uv && uv venv --python python3.12 /app/.venv
 
 # --------------------------------------------------------------------------------------------------
-# copy source code and files
+# Copy project files and install dependencies
 # --------------------------------------------------------------------------------------------------
 
+COPY pyproject.toml uv.lock README.md /app/
 COPY fivetran_mcp_server /app/fivetran_mcp_server
+
+# Install dependencies into the venv
+RUN uv pip install --python /app/.venv/bin/python .
+
+USER default
 
 # --------------------------------------------------------------------------------------------------
 # Set PYTHONPATH to include /app
 # --------------------------------------------------------------------------------------------------
 
 ENV PYTHONPATH=/app
-
 
 # --------------------------------------------------------------------------------------------------
 # add entrypoint for the container
