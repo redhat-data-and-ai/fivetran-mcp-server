@@ -17,6 +17,7 @@ A read-only MCP (Model Context Protocol) server for troubleshooting and diagnosi
 | `list_hybrid_agents(env?, status?)` | List hybrid agents filtered by environment and/or status |
 | `get_connector_schema_status(connector_id)` | Get table-level sync status |
 | `diagnose_connector(connector_id)` | **Smart** health check with recommendations |
+| `get_sync_history(connector_id, include_config?)` | Get sync timestamps, warnings with error details, and config |
 | `get_hybrid_agent_details(agent_id)` | Get details for a specific hybrid agent |
 
 ### list_connectors Parameters
@@ -57,7 +58,6 @@ cp .env.example .env
 
 ```bash
 # Option 1: Using environment variables directly
-ENABLE_AUTH=false \
 FIVETRAN_API_KEY="your-key" \
 FIVETRAN_API_SECRET="your-secret" \
 uv run python -m fivetran_mcp_server.main
@@ -109,7 +109,6 @@ curl http://localhost:8080/health
 | `FIVETRAN_BASE_URL` | `https://api.fivetran.com/v1` | Fivetran API base URL |
 | `MCP_HOST` | `localhost` | Server bind address |
 | `MCP_PORT` | `8080` | Server port |
-| `ENABLE_AUTH` | `true` | Enable OAuth (set to `false` for local dev) |
 | `PYTHON_LOG_LEVEL` | `INFO` | Logging level |
 
 ## Example Usage
@@ -164,6 +163,14 @@ list_hybrid_agents(env="prod", status="live")
 get_hybrid_agent_details(agent_id="abc123")
 ```
 
+### Get sync history and warnings
+```
+get_sync_history(connector_id="abc123")
+get_sync_history(connector_id="abc123", include_config=True)
+```
+
+Returns sync timestamps (last success/failure), active warnings with full error details, and optionally sync configuration. Warnings contain the actual error messages that explain why a connector failed.
+
 ### Diagnose a connector (smart health check)
 ```
 diagnose_connector(connector_id="abc123")
@@ -181,8 +188,6 @@ fivetran-mcp-server/
 │   ├── mcp.py               # MCP server & tool registration
 │   ├── settings.py          # Configuration
 │   ├── fivetran_client.py   # Fivetran API client
-│   ├── oauth/               # OAuth 2.0 (when ENABLE_AUTH=true)
-│   ├── storage/             # PostgreSQL storage
 │   ├── tools/
 │   │   └── connectors.py    # Connector tools
 │   └── utils/

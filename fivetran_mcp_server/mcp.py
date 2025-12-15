@@ -11,6 +11,7 @@ from fivetran_mcp_server.tools.connectors import (
     diagnose_connector,
     get_connector_schema_status,
     get_hybrid_agent_details,
+    get_sync_history,
     list_connectors,
     list_hybrid_agents,
 )
@@ -52,13 +53,15 @@ class FivetranMCPServer:
         - list_connectors: List connectors (filter by env and status)
         - get_connector_schema_status: See table-level sync status
         - diagnose_connector: Comprehensive health check with recommendations
+        - get_sync_history: Get sync timestamps, warnings, and config
         - list_hybrid_agents: List all hybrid deployment agents
         - get_hybrid_agent_details: Get details for a specific hybrid agent
         """
         self.mcp.tool()(list_connectors)
         self.mcp.tool()(get_connector_schema_status)
         self.mcp.tool()(diagnose_connector)
+        self.mcp.tool()(get_sync_history)
         self.mcp.tool()(list_hybrid_agents)
         self.mcp.tool()(get_hybrid_agent_details)
 
-        logger.info("Registered 5 Fivetran troubleshooting tools (read-only)")
+        logger.info("Registered 6 Fivetran troubleshooting tools (read-only)")

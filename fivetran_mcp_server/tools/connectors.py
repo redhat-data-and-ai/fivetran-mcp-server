@@ -755,3 +755,158 @@ async def diagnose_connector(connector_id: str) -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Error diagnosing connector {connector_id}: {e}")
         return {"status": "error", "error": str(e)}
+
+
+async def get_sync_history(
+    connector_id: str, include_config: bool = False
+) -> Dict[str, Any]:
+    """Get sync history and recent events for a connector.
+
+    Returns sync timestamps, recent warnings/errors with full details,
+    and sync configuration. This extracts the maximum sync information
+    available from the Fivetran REST API.
+
+    Note: For detailed historical sync logs, set up the Fivetran Platform
+    Connector which syncs logs to your destination.
+
+    Args:
+        connector_id: The unique identifier for the connector.
+        include_config: Whether to include sync configuration details.
+
+    Returns:
+        Dict containing:
+            - status: "success" or "error"
+            - connector_id: The connector ID
+            - sync_state: Current sync state
+            - last_syncs: Recent sync timestamps with calculated durations
+            - warnings: Active warnings with full error details
+            - sync_config: Sync frequency and schedule (if include_config=True)
+    """
+    # Input validation
+    if not connector_id or not connector_id.strip():
+        return {
+            "status": "error",
+            "error": "connector_id is required and cannot be empty",
+        }
+
+    connector_id = connector_id.strip()
+
+    try:
+        client = get_fivetran_client()
+        response = await client.get(f"connectors/{connector_id}")
+        connector = response.get("data", {})
+        status_info = connector.get("status", {})
+
+        # Extract sync timestamps
+        succeeded_at = connector.get("succeeded_at")
+        failed_at = connector.get("failed_at")
+        sync_started = connector.get("sync_started")
+        rescheduled_for = status_info.get("rescheduled_for")
+
+        # Calculate time since events
+        hours_since_success = _hours_since(succeeded_at)
+        hours_since_failure = _hours_since(failed_at)
+
+        # Build sync events list (what we know from timestamps)
+        sync_events: List[Dict[str, Any]] = []
+
+        if succeeded_at:
+            sync_events.append(
+                {
+                    "type": "success",
+                    "timestamp": succeeded_at,
+                    "hours_ago": hours_since_success,
+                }
+            )
+
+        if failed_at:
+            sync_events.append(
+                {
+                    "type": "failure",
+                    "timestamp": failed_at,
+                    "hours_ago": hours_since_failure,
+                }
+            )
+
+        # Sort by timestamp (most recent first)
+        sync_events.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+
+        # Extract warnings with full details (these contain error messages!)
+        warnings = status_info.get("warnings", [])
+        warning_details: List[Dict[str, Any]] = []
+        for w in warnings:
+            warning_details.append(
+                {
+                    "code": w.get("code", "unknown"),
+                    "message": w.get("message", ""),
+                    "details": w.get("details", {}),
+                }
+            )
+
+        # Extract tasks/failures if present
+        tasks = status_info.get("tasks", [])
+        task_details: List[Dict[str, Any]] = []
+        for t in tasks:
+            task_details.append(
+                {
+                    "code": t.get("code", "unknown"),
+                    "message": t.get("message", ""),
+                }
+            )
+
+        # Build response
+        result: Dict[str, Any] = {
+            "status": "success",
+            "connector_id": connector_id,
+            "dashboard_url": _get_connector_url(connector_id),
+            "service": connector.get("service"),
+            "schema": connector.get("schema"),
+            "current_state": {
+                "sync_state": status_info.get("sync_state"),
+                "setup_state": status_info.get("setup_state"),
+                "update_state": status_info.get("update_state"),
+                "is_historical_sync": status_info.get("is_historical_sync", False),
+                "paused": connector.get("paused", False),
+            },
+            "last_syncs": {
+                "last_success": succeeded_at,
+                "hours_since_success": hours_since_success,
+                "last_failure": failed_at,
+                "hours_since_failure": hours_since_failure,
+                "sync_in_progress": sync_started is not None,
+                "sync_started_at": sync_started,
+                "rescheduled_for": rescheduled_for,
+            },
+            "recent_events": sync_events[:5],  # Last 5 known events
+            "warnings": {
+                "count": len(warning_details),
+                "details": warning_details,
+            },
+            "tasks": {
+                "count": len(task_details),
+                "details": task_details,
+            },
+        }
+
+        # Optionally include sync configuration
+        if include_config:
+            result["sync_config"] = {
+                "sync_frequency": connector.get("sync_frequency"),
+                "schedule_type": connector.get("schedule_type"),
+                "daily_sync_time": connector.get("daily_sync_time"),
+                "networking_method": connector.get("networking_method"),
+                "local_processing_agent_id": connector.get("local_processing_agent_id"),
+            }
+
+        logger.info(f"Retrieved sync history for connector: {connector_id}")
+
+        return result
+
+    except FivetranAPIError as e:
+        return e.to_dict()
+    except ValueError as e:
+        logger.error(f"Configuration error: {e}")
+        return {"status": "error", "error": str(e)}
+    except Exception as e:
+        logger.error(f"Error getting sync history for {connector_id}: {e}")
+        return {"status": "error", "error": str(e)}
