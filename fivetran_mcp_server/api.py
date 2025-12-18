@@ -11,6 +11,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from fivetran_mcp_server import __version__
 from fivetran_mcp_server.mcp import FivetranMCPServer
 from fivetran_mcp_server.settings import settings
 from fivetran_mcp_server.utils.pylogger import get_python_logger
@@ -49,7 +50,7 @@ async def health_check():
             "status": "healthy",
             "service": "fivetran-mcp-server",
             "transport_protocol": settings.MCP_TRANSPORT_PROTOCOL,
-            "version": "0.1.0",
+            "version": __version__,
         },
     )
 

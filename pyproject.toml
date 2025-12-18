@@ -11,7 +11,7 @@ version = "0.1.0"
 description = "A read-only MCP server for troubleshooting Fivetran connectors"
 readme = "README.md"
 keywords = ["mcp", "fivetran", "server", "connectors"]
-requires-python = "==3.12.2"
+requires-python = ">=3.12"
 dependencies = [
     "fastmcp==2.10.4",
     "httpx==0.28.1",
@@ -32,10 +32,7 @@ dev = [
     "mypy==1.16.1",
     "pre-commit==4.2.0",
     "httpx==0.28.1",
-    "langchain-google-genai ==2.1.8",
-    "langchain_mcp_adapters==0.1.8",
-    "langgraph==0.5.4",
-    "bandit==1.8.6"
+    "bandit==1.8.6",
 ]
 
 [project.scripts]
@@ -57,7 +54,7 @@ quote-style = "double"
 indent-style = "space"
 
 [tool.ruff.lint.isort]
-known-first-party = ["src"]
+known-first-party = ["fivetran_mcp_server"]
 
 [tool.mypy]
 python_version = "3.12"
@@ -85,7 +82,7 @@ addopts = [
 markers = ["asyncio"]
 
 [tool.coverage.run]
-source = ["src"]
+source = ["fivetran_mcp_server"]
 omit = [
     "*/tests/*",
     "*/test_*",

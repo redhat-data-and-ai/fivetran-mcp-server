@@ -93,10 +93,9 @@ curl http://localhost:8080/health
 3. Reload Cursor (`Cmd+Shift+P` → "Developer: Reload Window")
 
 4. Ask questions like:
-   - "List my Fivetran groups"
-   - "Show connectors in group X"
-   - "Show failed connectors"
-   - "Get details for connector xyz"
+   - "List all connectors"
+   - "Show failed connectors in prod"
+   - "Diagnose connector xyz"
    - "Show me all hybrid agents"
    - "What's the status of hybrid agent abc?"
 
@@ -112,11 +111,6 @@ curl http://localhost:8080/health
 | `PYTHON_LOG_LEVEL` | `INFO` | Logging level |
 
 ## Example Usage
-
-### List all groups
-```
-list_groups()
-```
 
 ### List all connectors
 ```
@@ -171,12 +165,44 @@ get_sync_history(connector_id="abc123", include_config=True)
 
 Returns sync timestamps (last success/failure), active warnings with full error details, and optionally sync configuration. Warnings contain the actual error messages that explain why a connector failed.
 
-### Diagnose a connector (smart health check)
-```
-diagnose_connector(connector_id="abc123")
+## Development
+
+### Setup
+
+```bash
+# Install dependencies (creates .venv automatically)
+make install
+
+# Or manually
+uv venv
+uv pip install -e ".[dev]"
 ```
 
-Returns overall health status, issues with severity levels, and actionable recommendations.
+### Running Tests
+
+```bash
+# Run all tests
+make test
+
+# Or directly
+.venv/bin/python -m pytest
+
+# With coverage
+.venv/bin/python -m pytest --cov=fivetran_mcp_server
+
+# Specific test file
+.venv/bin/python -m pytest tests/test_connectors.py -v
+```
+
+### Code Quality
+
+```bash
+# Lint
+ruff check .
+
+# Format
+ruff format .
+```
 
 ## Project Structure
 

@@ -183,7 +183,6 @@ build.log
 *.tmp
 *.bak
 .idea
-uv.lock
 bandit-report.json
 safety-report.json
 .safety-project.ini
