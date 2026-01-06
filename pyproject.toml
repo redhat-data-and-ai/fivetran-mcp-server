@@ -39,9 +39,9 @@ dev = [
 fivetran-mcp-server = "fivetran_mcp_server.main:main"
 
 [project.urls]
-Homepage = "https://github.com/robrien/fivetran-mcp-server"
-Repository = "https://github.com/robrien/fivetran-mcp-server"
-Issues = "https://github.com/robrien/fivetran-mcp-server/issues"
+Homepage = "https://github.com/redhat-data-and-ai/fivetran-mcp-server"
+Repository = "https://github.com/redhat-data-and-ai/fivetran-mcp-server"
+Issues = "https://github.com/redhat-data-and-ai/fivetran-mcp-server/issues"
 
 [tool.ruff]
 target-version = "py312"

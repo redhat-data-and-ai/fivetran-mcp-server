@@ -46,7 +46,7 @@ A read-only MCP (Model Context Protocol) server for troubleshooting and diagnosi
 
 ```bash
 # Clone the repository
-git clone <repository-url>
+git clone https://github.com/redhat-data-and-ai/fivetran-mcp-server.git
 cd fivetran-mcp-server
 
 # Copy and configure environment variables
