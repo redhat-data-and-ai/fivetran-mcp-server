@@ -365,16 +365,16 @@ async def list_hybrid_agents(
         list_hybrid_agents(status="offline")          # All offline agents
         list_hybrid_agents(env="prod", status="live") # Live prod agents
     """
+    # Validate status filter before creating client
+    status_filter = (status or "all").lower()
+    if status_filter not in VALID_AGENT_STATUSES:
+        return {
+            "status": "error",
+            "error": f"Invalid status '{status}'. Must be one of: {', '.join(VALID_AGENT_STATUSES)}",
+        }
+
     try:
         client = get_fivetran_client()
-
-        # Validate status filter
-        status_filter = (status or "all").lower()
-        if status_filter not in VALID_AGENT_STATUSES:
-            return {
-                "status": "error",
-                "error": f"Invalid status '{status}'. Must be one of: {', '.join(VALID_AGENT_STATUSES)}",
-            }
 
         # Resolve environment to group IDs
         group_ids: List[str] = []
