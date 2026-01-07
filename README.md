@@ -74,6 +74,27 @@ The server starts at `http://localhost:8080`
 curl http://localhost:8080/health
 ```
 
+## Docker
+
+### Using Pre-built Image
+
+```bash
+docker pull ghcr.io/redhat-data-and-ai/fivetran-mcp-server:latest
+
+docker run -p 8080:8080 \
+  -e FIVETRAN_API_KEY=your_key \
+  -e FIVETRAN_API_SECRET=your_secret \
+  ghcr.io/redhat-data-and-ai/fivetran-mcp-server:latest
+```
+
+### Building Your Own Image
+
+```bash
+docker build -t fivetran-mcp-server -f Containerfile .
+docker tag fivetran-mcp-server <your-registry>/fivetran-mcp-server:<version>
+docker push <your-registry>/fivetran-mcp-server:<version>
+```
+
 ## Using with Cursor
 
 1. Create `.cursor/mcp.json` in your project:
