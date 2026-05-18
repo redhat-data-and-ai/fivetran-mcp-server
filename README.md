@@ -1,38 +1,29 @@
 # Fivetran MCP Server
 
-A read-only MCP (Model Context Protocol) server for troubleshooting and diagnosing Fivetran connector issues.
+A read-only MCP (Model Context Protocol) server for troubleshooting Fivetran connectors. Connect it to Cursor (or any MCP client) and diagnose sync issues, check connector health, and inspect configurations using natural language.
 
-## Features
+## What It Does
 
-- **Troubleshooting-focused**: Quickly identify failed or problematic connectors
-- **Read-only**: Safe operations only - no modifications to your Fivetran setup
-- **Cursor-compatible**: Works with Cursor IDE's MCP integration
-- **Generic**: Works with any Fivetran account structure
+- Lists and filters connectors by environment and health status
+- Diagnoses connector issues with actionable recommendations
+- Shows environment-level health summaries at a glance
+- Inspects connector configuration (with sensitive fields redacted)
+- Monitors hybrid deployment agents
+
+**Read-only** — no modifications to your Fivetran setup, ever.
 
 ## Available Tools
 
-| Tool | Description |
-|------|-------------|
-| `list_connectors(env?, status?)` | List connectors filtered by environment and/or status |
-| `list_hybrid_agents(env?, status?)` | List hybrid agents filtered by environment and/or status |
-| `get_connector_schema_status(connector_id)` | Get table-level sync status |
-| `diagnose_connector(connector_id)` | **Smart** health check with recommendations |
-| `get_sync_history(connector_id, include_config?)` | Get sync timestamps, warnings with error details, and config |
-| `get_hybrid_agent_details(agent_id)` | Get details for a specific hybrid agent |
-
-### list_connectors Parameters
-
-| Parameter | Values | Description |
-|-----------|--------|-------------|
-| `env` | `"dev"`, `"preprod"`, `"prod"`, `"sandbox"`, etc. | Filter by environment (partial match on group name) |
-| `status` | `"all"`, `"failed"`, `"healthy"`, `"paused"`, `"warning"` | Filter by connector health |
-
-### list_hybrid_agents Parameters
-
-| Parameter | Values | Description |
-|-----------|--------|-------------|
-| `env` | `"dev"`, `"preprod"`, `"prod"`, `"sandbox"`, etc. | Filter by environment (partial match on group name) |
-| `status` | `"all"`, `"live"`, `"offline"` | Filter by agent connection status |
+| Tool | What it does |
+|------|--------------|
+| `list_connectors` | List connectors, filter by env and status |
+| `get_group_health_summary` | Dashboard-style overview of an environment |
+| `diagnose_connector` | Health check with severity-ranked issues and recommendations |
+| `get_connector_config` | Full connector configuration (credentials redacted) |
+| `get_connector_schema_status` | Table-level sync status |
+| `get_sync_history` | Sync timestamps, warnings, and error details |
+| `list_hybrid_agents` | List hybrid deployment agents |
+| `get_hybrid_agent_details` | Detailed agent status and assigned connectors |
 
 ## Quick Start
 
@@ -42,62 +33,42 @@ A read-only MCP (Model Context Protocol) server for troubleshooting and diagnosi
 - [uv](https://docs.astral.sh/uv/) package manager
 - Fivetran API credentials ([Get them here](https://fivetran.com/docs/rest-api/getting-started))
 
-### Installation
+### 1. Install
 
 ```bash
-# Clone the repository
 git clone https://github.com/redhat-data-and-ai/fivetran-mcp-server.git
 cd fivetran-mcp-server
-
-# Copy and configure environment variables
-cp .env.example .env
-# Edit .env with your Fivetran API credentials
+make install
 ```
 
-### Running the Server
+### 2. Configure
 
 ```bash
-# Option 1: Using environment variables directly
-FIVETRAN_API_KEY="your-key" \
-FIVETRAN_API_SECRET="your-secret" \
-uv run python -m fivetran_mcp_server.main
-
-# Option 2: Using .env file (after configuring it)
-uv run python -m fivetran_mcp_server.main
+cp .env.example .env
 ```
 
-The server starts at `http://localhost:8080`
+Edit `.env` and add your Fivetran API key and secret:
 
-### Verify It's Working
+```
+FIVETRAN_API_KEY=your-api-key
+FIVETRAN_API_SECRET=your-api-secret
+```
+
+### 3. Run
+
+```bash
+make local
+```
+
+The server starts at `http://localhost:8080`. Verify with:
 
 ```bash
 curl http://localhost:8080/health
 ```
 
-## Docker
+### 4. Connect to Cursor
 
-### Using Pre-built Image
-
-```bash
-docker pull ghcr.io/redhat-data-and-ai/fivetran-mcp-server:latest
-
-docker run -p 8080:8080 \
-  -e FIVETRAN_API_KEY=your_key \
-  -e FIVETRAN_API_SECRET=your_secret \
-  ghcr.io/redhat-data-and-ai/fivetran-mcp-server:latest
-```
-
-### Building Your Own Image
-
-```bash
-docker build -t fivetran-mcp-server -f Containerfile .
-docker tag fivetran-mcp-server <your-registry>/fivetran-mcp-server:<version>
-docker push <your-registry>/fivetran-mcp-server:<version>
-```
-
-## Using with Cursor
-
-1. Create `.cursor/mcp.json` in your project:
+Add to `.cursor/mcp.json` in your project:
 
 ```json
 {
@@ -109,120 +80,142 @@ docker push <your-registry>/fivetran-mcp-server:<version>
 }
 ```
 
-2. Start the server (see above)
+Reload Cursor (`Cmd+Shift+P` → "Developer: Reload Window"), then ask:
 
-3. Reload Cursor (`Cmd+Shift+P` → "Developer: Reload Window")
+- "Show me failed connectors in prod"
+- "Diagnose connector shouldn_snack"
+- "Give me a health summary for dev"
+- "What's the config for connector abc123?"
+- "List offline hybrid agents"
 
-4. Ask questions like:
-   - "List all connectors"
-   - "Show failed connectors in prod"
-   - "Diagnose connector xyz"
-   - "Show me all hybrid agents"
-   - "What's the status of hybrid agent abc?"
+## Tool Reference
 
-## Configuration
+### list_connectors
 
-| Environment Variable | Default | Description |
-|---------------------|---------|-------------|
-| `FIVETRAN_API_KEY` | (required) | Your Fivetran API key |
-| `FIVETRAN_API_SECRET` | (required) | Your Fivetran API secret |
-| `FIVETRAN_BASE_URL` | `https://api.fivetran.com/v1` | Fivetran API base URL |
-| `MCP_HOST` | `localhost` | Server bind address |
-| `MCP_PORT` | `8080` | Server port |
-| `PYTHON_LOG_LEVEL` | `INFO` | Logging level |
+List connectors filtered by environment and/or health status.
 
-## Example Usage
-
-### List all connectors
-```
-list_connectors()
-```
-
-### List connectors by environment
-```
-list_connectors(env="prod")
-list_connectors(env="preprod")
-list_connectors(env="dev")
-```
-
-### List failed connectors
-```
-list_connectors(status="failed")
-```
-
-### List failed connectors in a specific environment
 ```
 list_connectors(env="prod", status="failed")
 ```
 
-### Diagnose a connector (health check with recommendations)
+| Parameter | Values | Description |
+|-----------|--------|-------------|
+| `env` | `"dev"`, `"preprod"`, `"prod"`, `"sandbox"`, or group ID | Partial match on group name |
+| `status` | `"all"`, `"failed"`, `"healthy"`, `"paused"`, `"warning"` | Filter by health |
+
+### get_group_health_summary
+
+Get an environment-level dashboard: connector counts by status plus the top 5 worst offenders.
+
+```
+get_group_health_summary(env="prod")
+```
+
+### diagnose_connector
+
+Comprehensive health check with severity-ranked issues and actionable recommendations.
+
 ```
 diagnose_connector(connector_id="abc123")
 ```
 
-### Check table sync status
+### get_connector_config
+
+Inspect full connector configuration (networking, schedule, source settings). Sensitive fields like passwords, tokens, and keys are automatically redacted.
+
+```
+get_connector_config(connector_id="abc123")
+```
+
+### get_connector_schema_status
+
+See which tables are enabled/disabled and their sync modes.
+
 ```
 get_connector_schema_status(connector_id="abc123")
 ```
 
-### List hybrid deployment agents
-```
-list_hybrid_agents()
-list_hybrid_agents(env="prod")
-list_hybrid_agents(status="offline")
-list_hybrid_agents(env="prod", status="live")
-```
+### get_sync_history
 
-### Get hybrid agent details
-```
-get_hybrid_agent_details(agent_id="abc123")
-```
+Get sync timestamps, active warnings with error messages, and optionally the sync schedule config.
 
-### Get sync history and warnings
 ```
 get_sync_history(connector_id="abc123")
 get_sync_history(connector_id="abc123", include_config=True)
 ```
 
-Returns sync timestamps (last success/failure), active warnings with full error details, and optionally sync configuration. Warnings contain the actual error messages that explain why a connector failed.
+### list_hybrid_agents
+
+List hybrid deployment agents filtered by environment and/or connection status.
+
+```
+list_hybrid_agents(env="prod", status="live")
+```
+
+| Parameter | Values | Description |
+|-----------|--------|-------------|
+| `env` | `"dev"`, `"preprod"`, `"prod"`, `"sandbox"` | Partial match on group name |
+| `status` | `"all"`, `"live"`, `"offline"` | Filter by connection status |
+
+### get_hybrid_agent_details
+
+Get detailed info for a specific agent including assigned connectors.
+
+```
+get_hybrid_agent_details(agent_id="abc123")
+```
+
+## Docker
+
+```bash
+# Pre-built image
+docker pull ghcr.io/redhat-data-and-ai/fivetran-mcp-server:latest
+
+docker run -p 8080:8080 \
+  -e FIVETRAN_API_KEY=your_key \
+  -e FIVETRAN_API_SECRET=your_secret \
+  ghcr.io/redhat-data-and-ai/fivetran-mcp-server:latest
+```
+
+Or build your own:
+
+```bash
+docker build -t fivetran-mcp-server -f Containerfile .
+```
+
+## Configuration
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `FIVETRAN_API_KEY` | (required) | Fivetran API key |
+| `FIVETRAN_API_SECRET` | (required) | Fivetran API secret |
+| `FIVETRAN_BASE_URL` | `https://api.fivetran.com/v1` | API base URL |
+| `MCP_HOST` | `localhost` | Server bind address |
+| `MCP_PORT` | `8080` | Server port |
+| `MCP_TRANSPORT_PROTOCOL` | `http` | Transport: `http`, `streamable-http`, or `sse` |
+| `PYTHON_LOG_LEVEL` | `INFO` | Log level |
 
 ## Development
 
-### Setup
-
 ```bash
-# Install dependencies (creates .venv automatically)
-make install
-
-# Or manually
-uv venv
-uv pip install -e ".[dev]"
+make install          # Set up venv + deps + pre-commit hooks
+make test             # Run tests
+make local            # Start the server locally
 ```
 
 ### Running Tests
 
 ```bash
-# Run all tests
-make test
-
-# Or directly
-.venv/bin/python -m pytest
-
-# With coverage
-.venv/bin/python -m pytest --cov=fivetran_mcp_server
-
-# Specific test file
-.venv/bin/python -m pytest tests/test_connectors.py -v
+.venv/bin/python -m pytest                              # All tests
+.venv/bin/python -m pytest --cov=fivetran_mcp_server    # With coverage
+.venv/bin/python -m pytest tests/test_connectors.py -v  # Specific file
 ```
 
 ### Code Quality
 
 ```bash
-# Lint
-ruff check .
-
-# Format
-ruff format .
+ruff check .    # Lint
+ruff format .   # Format
 ```
 
 ## Project Structure
@@ -230,19 +223,21 @@ ruff format .
 ```
 fivetran-mcp-server/
 ├── fivetran_mcp_server/
-│   ├── main.py              # Entry point
-│   ├── api.py               # FastAPI app
-│   ├── mcp.py               # MCP server & tool registration
-│   ├── settings.py          # Configuration
-│   ├── fivetran_client.py   # Fivetran API client
+│   ├── main.py              # Entry point (uvicorn)
+│   ├── api.py               # FastAPI app + health endpoint
+│   ├── mcp.py               # MCP server + tool registration
+│   ├── settings.py          # Pydantic settings + validation
+│   ├── fivetran_client.py   # HTTP client (retries, timeouts, pooling)
 │   ├── tools/
-│   │   └── connectors.py    # Connector tools
+│   │   ├── __init__.py      # Shared error handling decorator
+│   │   └── connectors.py    # All MCP tool implementations
 │   └── utils/
-│       └── pylogger.py      # Logging
-├── tests/                   # Test suite
+│       └── pylogger.py      # Structured logging (structlog)
+├── tests/                   # Pytest suite (138 tests, 80%+ coverage)
 ├── .env.example             # Environment template
-├── pyproject.toml           # Dependencies
-└── README.md
+├── Containerfile            # OCI container build
+├── Makefile                 # Dev commands
+└── pyproject.toml           # Dependencies + tool config
 ```
 
 ## License

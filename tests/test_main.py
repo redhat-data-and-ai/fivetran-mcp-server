@@ -221,24 +221,29 @@ class TestMain:
             assert call_args[1]["ssl_keyfile"] == "/path/to/key.pem"
             assert call_args[1]["ssl_certfile"] == "/path/to/cert.pem"
 
-    @patch("fivetran_mcp_server.main.run")
+    @patch("fivetran_mcp_server.main.validate_config")
+    @patch("fivetran_mcp_server.main.uvicorn")
     @patch("fivetran_mcp_server.main.logger")
-    @patch("fivetran_mcp_server.main.sys")
-    def test_main_keyboard_interrupt(self, mock_sys, mock_logger, mock_run):
+    def test_main_keyboard_interrupt(self, mock_logger, mock_uvicorn, mock_validate):
         """Test main function with keyboard interrupt."""
         # Arrange
-        mock_run.side_effect = KeyboardInterrupt()
+        mock_uvicorn.run.side_effect = KeyboardInterrupt()
+
+        mock_settings = Mock()
+        mock_settings.MCP_HOST = "0.0.0.0"
+        mock_settings.MCP_PORT = 4000
+        mock_settings.MCP_TRANSPORT_PROTOCOL = "streamable-http"
+        mock_settings.MCP_SSL_KEYFILE = None
+        mock_settings.MCP_SSL_CERTFILE = None
+        mock_settings.PYTHON_LOG_LEVEL = "INFO"
 
         # Act
-        try:
+        with patch("fivetran_mcp_server.main.settings", mock_settings):
             main()
-        except SystemExit:
-            pass  # Expected behavior
 
         # Assert
-        mock_logger.info.assert_called_with("Fivetran MCP server shutting down")
-        # The actual implementation might exit with 1 instead of 0
-        mock_sys.exit.assert_called_with(1)
+        mock_logger.info.assert_any_call("Received keyboard interrupt, shutting down")
+        mock_logger.info.assert_any_call("Fivetran MCP server shutting down")
 
     @patch("fivetran_mcp_server.main.validate_config")
     @patch("fivetran_mcp_server.main.handle_startup_error")

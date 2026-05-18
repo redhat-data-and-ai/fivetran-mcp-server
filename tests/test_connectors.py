@@ -1,10 +1,11 @@
 """Tests for the connectors tools module."""
 
 from datetime import datetime, timezone
-from unittest.mock import AsyncMock, Mock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
+from fivetran_mcp_server.fivetran_client import FivetranAPIError
 from fivetran_mcp_server.tools.connectors import (
     VALID_AGENT_STATUSES,
     VALID_STATUSES,
@@ -21,7 +22,6 @@ from fivetran_mcp_server.tools.connectors import (
     list_connectors,
     list_hybrid_agents,
 )
-from fivetran_mcp_server.fivetran_client import FivetranAPIError
 
 
 class TestHelperFunctions:
@@ -618,7 +618,7 @@ class TestDiagnoseConnector:
         mock_client = AsyncMock()
         mock_get_client.return_value = mock_client
         # Use a recent timestamp to avoid "no recent success" warning
-        from datetime import datetime, timezone, timedelta
+        from datetime import datetime, timedelta, timezone
 
         recent_time = (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat()
         mock_client.get.side_effect = [

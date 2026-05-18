@@ -13,7 +13,7 @@ logger = get_python_logger()
 
 # Load environment variables with error handling
 try:
-    load_dotenv()
+    load_dotenv(override=True)
 except Exception as e:
     # Log error but don't fail - environment variables might be set directly
     logger.warning(f"Could not load .env file: {e}")
@@ -158,6 +158,20 @@ def validate_config(settings: Settings) -> None:
     Raises:
         ValueError: If required configuration is missing or invalid.
     """
+    # Validate Fivetran API credentials (fail-fast instead of waiting for first tool call)
+    if not settings.FIVETRAN_API_KEY:
+        raise ValueError(
+            "FIVETRAN_API_KEY is required. "
+            "Set it as an environment variable or in your .env file. "
+            "Get your API key from: Fivetran Dashboard > Your Username > API Key"
+        )
+    if not settings.FIVETRAN_API_SECRET:
+        raise ValueError(
+            "FIVETRAN_API_SECRET is required. "
+            "Set it as an environment variable or in your .env file. "
+            "Get your API secret from: Fivetran Dashboard > Your Username > API Key"
+        )
+
     # Validate port range
     if not (1024 <= settings.MCP_PORT <= 65535):
         raise ValueError(

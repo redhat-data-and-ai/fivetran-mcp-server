@@ -113,9 +113,9 @@ def mock_structlog():
     return mock_structlog
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture
 def mock_imports():
-    """Mock external dependencies to avoid import errors during testing."""
+    """Mock external dependencies (use explicitly when needed, not autouse)."""
     with patch.dict(
         "sys.modules",
         {

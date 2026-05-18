@@ -58,18 +58,20 @@ class TestFivetranMCPServer:
     def test_register_mcp_tools(
         self, mock_fastmcp, mock_settings, mock_force_reconfigure
     ):
-        """Test MCP tools registration."""
+        """Test MCP tools registration registers exactly 6 tools."""
         # Arrange
         mock_mcp = Mock()
+        mock_tool_decorator = Mock(side_effect=lambda f: f)
+        mock_mcp.tool.return_value = mock_tool_decorator
         mock_fastmcp.return_value = mock_mcp
         mock_settings.PYTHON_LOG_LEVEL = "INFO"
-        server = FivetranMCPServer()
 
         # Act
-        server._register_mcp_tools()
+        FivetranMCPServer()
 
-        # Assert - currently no tools registered, just verify method exists
-        assert hasattr(server, "_register_mcp_tools")
+        # Assert - __init__ calls _register_mcp_tools, registering 8 tools
+        assert mock_mcp.tool.call_count == 8
+        assert mock_tool_decorator.call_count == 8
 
     def test_server_attributes(self):
         """Test that server has required attributes for tools-first architecture."""
