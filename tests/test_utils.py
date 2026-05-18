@@ -5,12 +5,9 @@ from unittest.mock import Mock, patch
 import pytest
 
 from fivetran_mcp_server.utils.pylogger import (
-    AWS_LOGGERS,
     ERROR_ONLY_LOGGERS,
     HTTP_CLIENT_LOGGERS,
     MCP_LOGGERS,
-    ML_AI_LOGGERS,
-    OBSERVABILITY_LOGGERS,
     THIRD_PARTY_LOGGERS,
     _clear_handlers,
     _configure_third_party_loggers,
@@ -390,76 +387,46 @@ class TestPylogger:
         assert "class" in default_handler
         assert "stream" in default_handler
 
-    def test_get_uvicorn_log_config_error_only_loggers(self):
-        """Test that ERROR_ONLY_LOGGERS are configured with ERROR level."""
+    def test_get_uvicorn_log_config_third_party_loggers(self):
+        """Test that THIRD_PARTY_LOGGERS are configured in uvicorn config."""
         # Act
         config = get_uvicorn_log_config("INFO")
 
         # Assert
         loggers_config = config["loggers"]
 
-        # Check that ERROR_ONLY_LOGGERS have ERROR level
-        for logger_name in ERROR_ONLY_LOGGERS:
+        for logger_name in THIRD_PARTY_LOGGERS:
             if logger_name in loggers_config:
-                assert loggers_config[logger_name]["level"] == "ERROR"
+                assert loggers_config[logger_name]["level"] == "INFO"
 
     # Tests for logger constants and sets
     def test_logger_constants_are_sets(self):
         """Test that all logger constants are sets."""
         assert isinstance(HTTP_CLIENT_LOGGERS, set)
-        assert isinstance(AWS_LOGGERS, set)
         assert isinstance(MCP_LOGGERS, set)
-        assert isinstance(ML_AI_LOGGERS, set)
-        assert isinstance(OBSERVABILITY_LOGGERS, set)
         assert isinstance(THIRD_PARTY_LOGGERS, set)
         assert isinstance(ERROR_ONLY_LOGGERS, set)
 
     def test_logger_constants_not_empty(self):
-        """Test that all logger constants contain entries."""
+        """Test that relevant logger constants contain entries."""
         assert len(HTTP_CLIENT_LOGGERS) > 0
-        assert len(AWS_LOGGERS) > 0
         assert len(MCP_LOGGERS) > 0
-        assert len(ML_AI_LOGGERS) > 0
-        assert len(OBSERVABILITY_LOGGERS) > 0
         assert len(THIRD_PARTY_LOGGERS) > 0
-        assert len(ERROR_ONLY_LOGGERS) > 0
 
     def test_third_party_loggers_aggregation(self):
         """Test that THIRD_PARTY_LOGGERS is the union of all logger sets."""
-        expected = (
-            HTTP_CLIENT_LOGGERS
-            | AWS_LOGGERS
-            | MCP_LOGGERS
-            | ML_AI_LOGGERS
-            | OBSERVABILITY_LOGGERS
-        )
+        expected = HTTP_CLIENT_LOGGERS | MCP_LOGGERS
         assert THIRD_PARTY_LOGGERS == expected
 
-    def test_error_only_loggers_subset(self):
-        """Test that ERROR_ONLY_LOGGERS is composed of specific logger sets."""
-        expected = ML_AI_LOGGERS | OBSERVABILITY_LOGGERS
-        assert ERROR_ONLY_LOGGERS == expected
+    def test_error_only_loggers_is_empty(self):
+        """Test that ERROR_ONLY_LOGGERS is empty (no irrelevant deps to silence)."""
+        assert ERROR_ONLY_LOGGERS == set()
 
     def test_logger_constants_contain_expected_entries(self):
         """Test that logger constants contain expected specific entries."""
-        # HTTP clients
         assert "urllib3" in HTTP_CLIENT_LOGGERS
-        assert "requests" in HTTP_CLIENT_LOGGERS
         assert "httpx" in HTTP_CLIENT_LOGGERS
-
-        # AWS
-        assert "botocore" in AWS_LOGGERS
-        assert "boto3" in AWS_LOGGERS
-
-        # MCP
         assert "fastmcp" in MCP_LOGGERS
-
-        # ML/AI
-        assert "sentence_transformers" in ML_AI_LOGGERS
-        assert "transformers" in ML_AI_LOGGERS
-
-        # Observability
-        assert "langfuse" in OBSERVABILITY_LOGGERS
 
     # Tests for internal helper functions
     def test_clear_handlers(self):
@@ -500,15 +467,17 @@ class TestPylogger:
 
     @patch("fivetran_mcp_server.utils.pylogger.logging")
     @patch("fivetran_mcp_server.utils.pylogger._clear_handlers")
+    @patch(
+        "fivetran_mcp_server.utils.pylogger.ERROR_ONLY_LOGGERS", {"test_error_logger"}
+    )
     def test_setup_logger_error_only_logger(self, mock_clear_handlers, mock_logging):
         """Test _setup_logger for loggers in ERROR_ONLY_LOGGERS."""
         # Arrange
-        # Pick a logger from ERROR_ONLY_LOGGERS
-        logger_name = list(ERROR_ONLY_LOGGERS)[0]
+        logger_name = "test_error_logger"
         log_level = "INFO"
         mock_logger = Mock()
         mock_logging.getLogger.return_value = mock_logger
-        mock_logging.ERROR = 40  # Mock the logging level constant
+        mock_logging.ERROR = 40
 
         # Act
         _setup_logger(logger_name, log_level)

@@ -25,7 +25,7 @@ def validate_config() -> None:
         RuntimeError: If configuration is in an inconsistent state.
     """
     try:
-        # Use the validate_config function from config.py
+        # Use the validate_config function from settings.py
         validate_config_func(settings)
 
         # Additional validation specific to main.py
