@@ -40,6 +40,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 app = FastAPI(lifespan=lifespan)
 
+if settings.CORS_ENABLED:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.CORS_ORIGINS,
+        allow_credentials=settings.CORS_CREDENTIALS,
+        allow_methods=settings.CORS_METHODS,
+        allow_headers=settings.CORS_HEADERS,
+    )
+
 
 @app.get("/health")
 async def health_check():
@@ -56,12 +65,3 @@ async def health_check():
 
 
 app.mount("/", mcp_app)
-
-if settings.CORS_ENABLED:
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=settings.CORS_ORIGINS,
-        allow_credentials=settings.CORS_CREDENTIALS,
-        allow_methods=settings.CORS_METHODS,
-        allow_headers=settings.CORS_HEADERS,
-    )

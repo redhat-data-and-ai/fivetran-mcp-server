@@ -1,11 +1,13 @@
 """Fivetran API client for the Fivetran MCP Server.
 
 This module provides a client for interacting with the Fivetran REST API.
-It handles authentication using Basic Auth with Base64-encoded credentials.
+It handles authentication using Basic Auth with Base64-encoded credentials,
+with automatic retry for transient errors and rate-limit awareness.
 
 See: https://fivetran.com/docs/rest-api/getting-started
 """
 
+import asyncio
 import base64
 from typing import Any, Dict, Optional
 
@@ -15,6 +17,17 @@ from fivetran_mcp_server.settings import settings
 from fivetran_mcp_server.utils.pylogger import get_python_logger
 
 logger = get_python_logger()
+
+DEFAULT_TIMEOUT = httpx.Timeout(
+    connect=10.0,
+    read=30.0,
+    write=10.0,
+    pool=5.0,
+)
+
+RETRYABLE_STATUS_CODES = {429, 500, 502, 503, 504}
+MAX_RETRIES = 3
+INITIAL_BACKOFF_SECONDS = 1.0
 
 
 class FivetranAPIError(Exception):
@@ -48,12 +61,12 @@ class FivetranAPIError(Exception):
 class FivetranClient:
     """Client for interacting with the Fivetran REST API.
 
-    This client handles authentication and provides methods for making
-    GET, POST, PATCH, and DELETE requests to the Fivetran API.
+    Uses a long-lived httpx.AsyncClient for connection pooling and
+    explicit timeouts. The client should be closed when no longer needed
+    via the `aclose()` method.
 
     Attributes:
         base_url: The base URL for the Fivetran API.
-        headers: HTTP headers including authentication.
     """
 
     def __init__(
@@ -61,6 +74,7 @@ class FivetranClient:
         api_key: Optional[str] = None,
         api_secret: Optional[str] = None,
         base_url: Optional[str] = None,
+        timeout: Optional[httpx.Timeout] = None,
     ):
         """Initialize the Fivetran client.
 
@@ -68,6 +82,7 @@ class FivetranClient:
             api_key: Fivetran API key. Defaults to settings.FIVETRAN_API_KEY.
             api_secret: Fivetran API secret. Defaults to settings.FIVETRAN_API_SECRET.
             base_url: Fivetran API base URL. Defaults to settings.FIVETRAN_BASE_URL.
+            timeout: Custom timeout configuration. Defaults to DEFAULT_TIMEOUT.
 
         Raises:
             ValueError: If API key or secret is not provided.
@@ -82,16 +97,89 @@ class FivetranClient:
                 "Set them as environment variables or pass them to the constructor."
             )
 
-        # Create Basic Auth header
         credentials = f"{self.api_key}:{self.api_secret}"
         encoded = base64.b64encode(credentials.encode()).decode()
-        self.headers = {
+        headers = {
             "Authorization": f"Basic {encoded}",
             "Content-Type": "application/json",
             "Accept": "application/json",
         }
 
+        self._client = httpx.AsyncClient(
+            headers=headers,
+            timeout=timeout or DEFAULT_TIMEOUT,
+        )
+
         logger.info("Fivetran client initialized", base_url=self.base_url)
+
+    async def aclose(self) -> None:
+        """Close the underlying HTTP client and release connections."""
+        await self._client.aclose()
+
+    async def _request_with_retry(
+        self,
+        method: str,
+        url: str,
+        endpoint: str,
+        **kwargs: Any,
+    ) -> httpx.Response:
+        """Execute an HTTP request with retry logic for transient failures.
+
+        Retries on 429 (rate limit) and 5xx errors with exponential backoff.
+        For 429 responses, respects the Retry-After header if present.
+        """
+        last_response: Optional[httpx.Response] = None
+
+        for attempt in range(MAX_RETRIES + 1):
+            response = await self._client.request(method, url, **kwargs)
+            last_response = response
+
+            if response.status_code < 400:
+                return response
+
+            if response.status_code not in RETRYABLE_STATUS_CODES:
+                break
+
+            if attempt == MAX_RETRIES:
+                break
+
+            backoff = self._calculate_backoff(response, attempt)
+            logger.warning(
+                f"Retryable error {response.status_code} on {method} {endpoint}, "
+                f"attempt {attempt + 1}/{MAX_RETRIES}, retrying in {backoff:.1f}s"
+            )
+            await asyncio.sleep(backoff)
+
+        assert last_response is not None
+        return last_response
+
+    def _calculate_backoff(self, response: httpx.Response, attempt: int) -> float:
+        """Calculate backoff duration, respecting Retry-After header for 429s."""
+        if response.status_code == 429:
+            retry_after = response.headers.get("Retry-After")
+            if retry_after:
+                try:
+                    return float(retry_after)
+                except ValueError:
+                    pass
+        return INITIAL_BACKOFF_SECONDS * (2**attempt)
+
+    def _parse_response_json(
+        self, response: httpx.Response, endpoint: str
+    ) -> Dict[str, Any]:
+        """Safely parse JSON from a response, handling empty or non-JSON bodies."""
+        if response.status_code == 204 or not response.content:
+            return {"status": "success"}
+
+        try:
+            return response.json()
+        except Exception:
+            raise FivetranAPIError(
+                status_code=response.status_code,
+                message=f"Invalid JSON response from {endpoint}",
+                hint="The API returned a non-JSON response body",
+                docs="https://fivetran.com/docs/rest-api/api-reference",
+            )
 
     def _handle_error(self, response: httpx.Response, endpoint: str) -> None:
         """Handle HTTP errors with helpful messages.
@@ -142,7 +230,6 @@ class FivetranClient:
                 docs=info["docs"],
             )
         else:
-            # Generic error
             try:
                 body = response.json()
                 message = body.get("message", response.text)
@@ -173,11 +260,10 @@ class FivetranClient:
         url = f"{self.base_url}/{endpoint.lstrip('/')}"
         logger.debug(f"GET {url}")
 
-        async with httpx.AsyncClient() as client:
-            response = await client.get(url, headers=self.headers, params=params)
-            if response.status_code >= 400:
-                self._handle_error(response, endpoint)
-            return response.json()
+        response = await self._request_with_retry("GET", url, endpoint, params=params)
+        if response.status_code >= 400:
+            self._handle_error(response, endpoint)
+        return self._parse_response_json(response, endpoint)
 
     async def post(self, endpoint: str, data: Dict[str, Any]) -> Dict[str, Any]:
         """Make a POST request to the Fivetran API.
@@ -195,11 +281,10 @@ class FivetranClient:
         url = f"{self.base_url}/{endpoint.lstrip('/')}"
         logger.debug(f"POST {url}")
 
-        async with httpx.AsyncClient() as client:
-            response = await client.post(url, headers=self.headers, json=data)
-            if response.status_code >= 400:
-                self._handle_error(response, endpoint)
-            return response.json()
+        response = await self._request_with_retry("POST", url, endpoint, json=data)
+        if response.status_code >= 400:
+            self._handle_error(response, endpoint)
+        return self._parse_response_json(response, endpoint)
 
     async def patch(self, endpoint: str, data: Dict[str, Any]) -> Dict[str, Any]:
         """Make a PATCH request to the Fivetran API.
@@ -217,11 +302,10 @@ class FivetranClient:
         url = f"{self.base_url}/{endpoint.lstrip('/')}"
         logger.debug(f"PATCH {url}")
 
-        async with httpx.AsyncClient() as client:
-            response = await client.patch(url, headers=self.headers, json=data)
-            if response.status_code >= 400:
-                self._handle_error(response, endpoint)
-            return response.json()
+        response = await self._request_with_retry("PATCH", url, endpoint, json=data)
+        if response.status_code >= 400:
+            self._handle_error(response, endpoint)
+        return self._parse_response_json(response, endpoint)
 
     async def delete(self, endpoint: str) -> Dict[str, Any]:
         """Make a DELETE request to the Fivetran API.
@@ -238,14 +322,12 @@ class FivetranClient:
         url = f"{self.base_url}/{endpoint.lstrip('/')}"
         logger.debug(f"DELETE {url}")
 
-        async with httpx.AsyncClient() as client:
-            response = await client.delete(url, headers=self.headers)
-            if response.status_code >= 400:
-                self._handle_error(response, endpoint)
-            return response.json()
+        response = await self._request_with_retry("DELETE", url, endpoint)
+        if response.status_code >= 400:
+            self._handle_error(response, endpoint)
+        return self._parse_response_json(response, endpoint)
 
 
-# Singleton instance - lazily initialized
 _client: Optional[FivetranClient] = None
 
 

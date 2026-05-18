@@ -6,27 +6,14 @@ from typing import Any, Dict, List, Set
 
 import structlog
 
-# HTTP clients
+# HTTP clients (runtime dependency: httpx)
 HTTP_CLIENT_LOGGERS = {
     "urllib3",
     "urllib3.connectionpool",
-    "urllib3.util",
-    "urllib3.util.retry",
-    "requests",
     "httpx",
 }
 
-# AWS SDK
-AWS_LOGGERS = {
-    "botocore",
-    "botocore.client",
-    "botocore.credentials",
-    "botocore.httpsession",
-    "boto3",
-    "boto3.resources",
-}
-
-# MCP (custom platform)
+# MCP framework (runtime dependency: fastmcp)
 MCP_LOGGERS = {
     "fastmcp",
     "fastmcp.server",
@@ -37,41 +24,11 @@ MCP_LOGGERS = {
     "fastmcp.transports",
 }
 
-# ML/AI frameworks
-ML_AI_LOGGERS = {
-    "sentence_transformers",
-    "transformers",
-    "transformers.models",
-    "transformers.tokenization_utils",
-    "transformers.tokenization_utils_base",
-    "transformers.configuration_utils",
-    "transformers.modeling_utils",
-    "huggingface_hub",
-    "huggingface_hub.utils",
-    "langchain_huggingface",
-    "torch",
-    "torch.nn",
-}
-
-# Observability / telemetry
-OBSERVABILITY_LOGGERS = {
-    "langfuse",
-    "langfuse.client",
-    "langfuse.api",
-    "langfuse.callback",
-}
-
 # --- Aggregated Sets ---
 
-THIRD_PARTY_LOGGERS: Set[str] = (
-    HTTP_CLIENT_LOGGERS
-    | AWS_LOGGERS
-    | MCP_LOGGERS
-    | ML_AI_LOGGERS
-    | OBSERVABILITY_LOGGERS
-)
+THIRD_PARTY_LOGGERS: Set[str] = HTTP_CLIENT_LOGGERS | MCP_LOGGERS
 
-ERROR_ONLY_LOGGERS: Set[str] = ML_AI_LOGGERS | OBSERVABILITY_LOGGERS
+ERROR_ONLY_LOGGERS: Set[str] = set()
 
 _LOGGING_CONFIGURED = False
 
