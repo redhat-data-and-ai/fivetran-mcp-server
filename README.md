@@ -41,6 +41,8 @@ cd fivetran-mcp-server
 make install
 ```
 
+`make install` sets up the venv, dependencies, and pre-commit hooks (`gitleaks` and `detect-private-key` for secret scanning). Also enable [GitHub Secret Scanning](https://docs.github.com/en/code-security/concepts/secret-security/secret-scanning) and [Push Protection](https://docs.github.com/en/code-security/concepts/secret-security/push-protection) on the repository for defense in depth.
+
 ### 2. Configure
 
 ```bash
